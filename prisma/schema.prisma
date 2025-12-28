@@ -1,0 +1,42 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  documents Document[]
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  workspaceId String
+  filename    String
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  chunks    Chunk[]
+}
+
+model Chunk {
+  id         String                @id @default(cuid())
+  documentId String
+  content    String
+  embedding  Unsupported("vector")
+  createdAt  DateTime              @default(now())
+
+  document Document @relation(fields: [documentId], references: [id])
+}

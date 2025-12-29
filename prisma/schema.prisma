@@ -5,8 +5,8 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider   = "prisma-client-js"
+  engineType = "binary"
 }
 
 datasource db {
@@ -25,18 +25,21 @@ model Document {
   id          String   @id @default(cuid())
   workspaceId String
   filename    String
+  contentHash String
   createdAt   DateTime @default(now())
 
   workspace Workspace @relation(fields: [workspaceId], references: [id])
   chunks    Chunk[]
+
+  @@unique([workspaceId, contentHash])
 }
 
 model Chunk {
-  id         String                @id @default(cuid())
-  documentId String
-  content    String
-  embedding  Unsupported("vector")
-  createdAt  DateTime              @default(now())
+  id          String   @id @default(cuid())
+  documentId  String
+  content     String
+  headingPath String   @default("")
+  createdAt   DateTime @default(now())
 
   document Document @relation(fields: [documentId], references: [id])
 }

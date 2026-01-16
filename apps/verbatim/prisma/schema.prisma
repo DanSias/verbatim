@@ -1,0 +1,154 @@
+// Verbatim Prisma Schema
+// Based on ARCHITECTURE.md Section 4 (Core Concepts and Data Model)
+// and TECH_STACK.md Section 5 (Data & Storage Layer)
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [vector]
+}
+
+// ============================================================================
+// Section 4.1: Workspace
+// A top-level container for documents (e.g., a pilot workspace for internal testing)
+// ============================================================================
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documents     Document[]
+  conversations Conversation[]
+
+  @@map("workspaces")
+}
+
+// ============================================================================
+// Section 4.2: Corpus (as enum)
+// Logical collection of sources: docs (Next.js MDX) or kb (Freshdesk MD)
+// ============================================================================
+
+enum Corpus {
+  docs
+  kb
+}
+
+// ============================================================================
+// Section 4.3: Document
+// An ingested unit of content with route-first identity (docs) or path-first (kb)
+// ============================================================================
+
+model Document {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Identity (Critical - see ARCHITECTURE.md Section 4.3)
+  // canonicalId format: "docs:/some/route" or "kb:relative/path.md"
+  canonicalId String
+
+  // Corpus type
+  corpus Corpus
+
+  // Route (docs only, null for kb)
+  route String?
+
+  // Source path for traceability
+  sourcePath String
+
+  // Display title (derived from frontmatter, H1, or folder name)
+  title String?
+
+  // Content hash for change detection (see Section 6.5)
+  contentHash String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  chunks Chunk[]
+
+  // canonicalId must be unique within a workspace
+  @@unique([workspaceId, canonicalId])
+  @@index([workspaceId, corpus])
+  @@map("documents")
+}
+
+// ============================================================================
+// Section 4.4: Chunk
+// A retrieval unit derived from a Document
+// ============================================================================
+
+model Chunk {
+  id         String   @id @default(cuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  // Chunk content
+  content String
+
+  // Heading breadcrumb for display/debugging (e.g., ["H1 Title", "H2 Section"])
+  headingPath String[]
+
+  // Anchor for linkable citations (docs only, GitHub-style slug)
+  // Citation URL format: {route}#{anchor}
+  anchor String?
+
+  // Chunk ordering within document
+  chunkIndex Int
+
+  // Vector embedding (pgvector) - dimension set based on embedding model
+  // Stored as Unsupported type; will be added via raw SQL migration
+  // embedding Unsupported("vector(1536)")?
+
+  createdAt DateTime @default(now())
+
+  @@index([documentId])
+  @@map("chunks")
+}
+
+// ============================================================================
+// Section 10: Conversation and Memory
+// Session-scoped memory for chat context
+// ============================================================================
+
+model Conversation {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages Message[]
+
+  @@index([workspaceId])
+  @@map("conversations")
+}
+
+enum MessageRole {
+  user
+  assistant
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role    MessageRole
+  content String
+
+  // Optional: store citations returned with assistant messages
+  // citations Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId])
+  @@map("messages")
+}

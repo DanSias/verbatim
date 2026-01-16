@@ -1,0 +1,20 @@
+{
+  "name": "verbatim",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/verbatim",
+    "build": "npm run build --workspace=apps/verbatim",
+    "lint": "npm run lint --workspaces --if-present",
+    "db:generate": "npm run db:generate --workspace=apps/verbatim",
+    "db:push": "npm run db:push --workspace=apps/verbatim",
+    "db:migrate": "npm run db:migrate --workspace=apps/verbatim"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

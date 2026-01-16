@@ -12,9 +12,15 @@
     "lint": "npm run lint --workspaces --if-present",
     "db:generate": "npm run db:generate --workspace=apps/verbatim",
     "db:push": "npm run db:push --workspace=apps/verbatim",
-    "db:migrate": "npm run db:migrate --workspace=apps/verbatim"
+    "db:migrate": "npm run db:migrate --workspace=apps/verbatim",
+    "test": "npm run test --workspace=apps/verbatim",
+    "test:watch": "npm run test:watch --workspace=apps/verbatim",
+    "test:integration": "npm run test:integration --workspace=apps/verbatim"
   },
   "engines": {
     "node": ">=24.0.0"
+  },
+  "devDependencies": {
+    "prettier": "^3.8.0"
   }
 }

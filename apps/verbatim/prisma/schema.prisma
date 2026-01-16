@@ -102,9 +102,10 @@ model Chunk {
   // Chunk ordering within document
   chunkIndex Int
 
-  // Vector embedding (pgvector) - dimension set based on embedding model
-  // Stored as Unsupported type; will be added via raw SQL migration
-  // embedding Unsupported("vector(1536)")?
+  // Vector embedding (pgvector)
+  // Dimension 1536 for OpenAI text-embedding-3-small / ada-002
+  // See TECH_STACK.md Section 6.1
+  embedding Unsupported("vector(1536)")?
 
   createdAt DateTime @default(now())
 

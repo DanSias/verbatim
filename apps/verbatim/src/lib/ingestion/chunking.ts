@@ -4,15 +4,19 @@
  * Implements corpus-aware H2-based chunking.
  * See ARCHITECTURE.md Section 8.
  *
- * Chunk boundary rules for docs:
+ * Chunk boundary rules (both corpora):
  * - Chunk boundary = H2 (##)
- * - H1 is page-level context (not a chunk boundary)
+ * - H1 is page/article-level context (not a chunk boundary)
  * - H3+ remain inside the H2 chunk
  *
  * Each chunk stores:
  * - headingPath: breadcrumb [H1?, H2]
- * - anchor: GitHub-style slug for linkable citations
+ * - anchor: GitHub-style slug (docs only; null for KB)
  * - content: the chunk text
+ *
+ * Key difference between corpora:
+ * - Docs: anchors are computed for linkable citations
+ * - KB: anchors are null (no navigation links per ARCHITECTURE.md Section 7.2)
  */
 
 import GithubSlugger from 'github-slugger';
@@ -55,11 +59,12 @@ interface Section {
 
 /**
  * Chunk normalized MDX content using H2 boundaries.
+ * Used for docs corpus - computes anchors for linkable citations.
  *
  * @param normalizedContent - The normalized text content (MDX stripped)
  * @param h1Title - The H1 title (page context), if present
  * @param config - Chunking configuration
- * @returns Array of chunks
+ * @returns Array of chunks with anchors
  */
 export function chunkDocsContent(
   normalizedContent: string,
@@ -71,7 +76,37 @@ export function chunkDocsContent(
   let chunkIndex = 0;
 
   for (const section of sections) {
-    const sectionChunks = chunkSection(section, h1Title, config, chunkIndex);
+    const sectionChunks = chunkSection(section, h1Title, config, chunkIndex, true);
+    chunks.push(...sectionChunks);
+    chunkIndex += sectionChunks.length;
+  }
+
+  return chunks;
+}
+
+/**
+ * Chunk normalized Markdown content using H2 boundaries.
+ * Used for KB corpus - does NOT compute anchors (KB has no routes/navigation).
+ *
+ * See ARCHITECTURE.md Section 8.2 (KB corpus) and Section 8.5.
+ *
+ * @param normalizedContent - The normalized text content
+ * @param h1Title - The H1 title (article context), if present
+ * @param config - Chunking configuration
+ * @returns Array of chunks without anchors
+ */
+export function chunkKbContent(
+  normalizedContent: string,
+  h1Title: string | null,
+  config: ChunkingConfig = DEFAULT_CHUNKING_CONFIG
+): Chunk[] {
+  const sections = splitByH2(normalizedContent);
+  const chunks: Chunk[] = [];
+  let chunkIndex = 0;
+
+  for (const section of sections) {
+    // Pass includeAnchors=false for KB corpus
+    const sectionChunks = chunkSection(section, h1Title, config, chunkIndex, false);
     chunks.push(...sectionChunks);
     chunkIndex += sectionChunks.length;
   }
@@ -144,12 +179,19 @@ function splitByH2(content: string): Section[] {
 /**
  * Chunk a single H2 section, applying size splitting if needed.
  * All size-split windows share the same anchor.
+ *
+ * @param section - The H2 section to chunk
+ * @param h1Title - The H1 title for heading path
+ * @param config - Chunking configuration
+ * @param startIndex - Starting chunk index
+ * @param includeAnchors - Whether to include anchors (true for docs, false for KB)
  */
 function chunkSection(
   section: Section,
   h1Title: string | null,
   config: ChunkingConfig,
-  startIndex: number
+  startIndex: number,
+  includeAnchors: boolean
 ): Chunk[] {
   const { maxChars, overlapChars } = config;
   const content = section.content;
@@ -163,8 +205,10 @@ function chunkSection(
     headingPath.push(section.heading);
   }
 
-  // Determine anchor (null for preamble sections)
-  const anchor = section.anchor || null;
+  // Determine anchor:
+  // - For docs: use computed anchor (null for preamble sections)
+  // - For KB: always null (no navigation links)
+  const anchor = includeAnchors ? (section.anchor || null) : null;
 
   // If content fits in one chunk, return it directly
   if (content.length <= maxChars) {

@@ -1,0 +1,31 @@
+# Getting Started
+
+Welcome to the platform documentation. This guide covers the essential concepts for integrating with our payment processing system.
+
+## Overview
+
+The platform provides APIs for processing payments, managing merchant accounts, and handling webhooks. All API requests require authentication using your workspace credentials.
+
+Key features include:
+- Payment processing with multiple payment methods
+- Merchant account management
+- Real-time webhook notifications
+- Comprehensive reporting and analytics
+
+## Configuration
+
+Before making API calls, configure your environment with the appropriate base URL and authentication headers. Development and production environments use separate credentials.
+
+Set the following environment variables:
+- API_BASE_URL: The base endpoint for all API requests
+- API_KEY: Your workspace API key
+- WORKSPACE_ID: Your unique workspace identifier
+
+## Limits
+
+Rate limits apply to all API endpoints. The default limit is 1000 requests per minute per workspace. Exceeding this limit results in HTTP 429 responses.
+
+Payload size limits:
+- Request body: 10 MB maximum
+- Response body: 50 MB maximum
+- Batch operations: 100 items per request

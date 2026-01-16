@@ -1,0 +1,49 @@
+# Merchant Accounts
+
+Merchant accounts represent the business entities that process payments through the platform. Each merchant account has its own configuration, processing limits, and settlement schedule.
+
+## Setup
+
+To create a new merchant account, use the merchant accounts API endpoint. The setup process requires business verification and may take up to 48 hours for approval.
+
+Required fields for merchant account setup:
+- Business legal name
+- Tax identification number
+- Bank account for settlements
+- Business address and contact information
+
+```typescript
+const merchant = await client.merchants.create({
+  legalName: 'Acme Corporation',
+  taxId: '12-3456789',
+  bankAccount: {
+    routingNumber: '021000021',
+    accountNumber: '123456789',
+  },
+  address: {
+    street: '123 Main St',
+    city: 'New York',
+    state: 'NY',
+    postalCode: '10001',
+  },
+});
+```
+
+## Configuration
+
+Each merchant account supports custom configuration options for payment processing behavior. Configuration changes take effect immediately for new transactions.
+
+Configurable options include:
+- Default currency for transactions
+- Automatic capture vs manual capture
+- Fraud detection sensitivity level
+- Receipt and notification preferences
+
+## Limits
+
+Merchant accounts have processing limits based on their verification status and history. New accounts start with lower limits that increase over time.
+
+Default processing limits for new accounts:
+- Daily transaction volume: $10,000
+- Single transaction maximum: $2,500
+- Monthly processing cap: $50,000

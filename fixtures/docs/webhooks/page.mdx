@@ -1,0 +1,33 @@
+# Webhooks
+
+Webhooks deliver real-time notifications about events in your workspace. Configure webhook endpoints to receive HTTP POST requests when specific events occur.
+
+## Setup
+
+Register webhook endpoints through the dashboard or API. Each endpoint requires a valid HTTPS URL and can subscribe to one or more event types.
+
+Supported event types:
+- payment.completed: Successful payment processed
+- payment.failed: Payment attempt failed
+- refund.created: Refund initiated
+- chargeback.opened: Chargeback dispute received
+
+## Configuration
+
+Webhook configuration controls delivery behavior and retry logic. Customize settings per endpoint to match your infrastructure requirements.
+
+Configuration options:
+- Retry attempts: Number of delivery retries (default: 5)
+- Retry interval: Time between retries in seconds
+- Timeout: Maximum wait time for response (default: 30 seconds)
+- Secret key: HMAC signing key for payload verification
+
+## Verification
+
+Always verify webhook signatures before processing payloads. The platform signs each webhook request using HMAC-SHA256 with your endpoint secret key.
+
+Verification steps:
+1. Extract the signature from the X-Webhook-Signature header
+2. Compute HMAC-SHA256 of the raw request body using your secret
+3. Compare the computed signature with the header value
+4. Reject requests with mismatched signatures

@@ -19,7 +19,7 @@ datasource db {
 
 model Workspace {
   id        String   @id @default(cuid())
-  name      String
+  name      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -125,7 +125,7 @@ export function deriveTitle(
 
 /**
  * Validate that a file path is a valid docs page.
- * Only **/page.mdx files are valid for docs corpus.
+ * Only page.mdx files (at any nesting depth) are valid for docs corpus.
  *
  * @param relativePath - The relative file path
  * @returns True if the path is a valid docs page

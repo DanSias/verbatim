@@ -118,8 +118,8 @@ Examples:
 /**
  * Recursively find all files matching the corpus pattern.
  *
- * For docs: only **/page.mdx files
- * For kb: all *.md files
+ * For docs: only page.mdx files (any nesting depth)
+ * For kb: all .md files
  */
 function findFiles(config: Config): FileInfo[] {
   const files: FileInfo[] = [];

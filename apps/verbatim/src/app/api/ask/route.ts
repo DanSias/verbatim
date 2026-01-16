@@ -1,54 +1,183 @@
 /**
  * POST /api/ask
  *
- * Main Q&A endpoint for Verbatim.
+ * Retrieval-only Q&A endpoint for Verbatim.
+ * Returns best matching chunks and citations without LLM generation.
+ *
  * See ARCHITECTURE.md Section 11.3.
  *
- * Request: AskRequest
- * Response: AskResponse
+ * Request:
+ *   - workspaceId: string (required)
+ *   - question: string (required)
+ *   - conversationId?: string (echoed back; memory not implemented yet)
+ *   - topK?: number (default 8)
+ *   - corpusScope?: Array<'docs'|'kb'> (default both)
+ *
+ * Response:
+ *   - question, workspaceId, conversationId
+ *   - results: ranked chunks with citations
+ *   - suggestedRoutes: docs-only route suggestions
+ *   - debug: retrieval mode info
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import type { AskRequest, AskResponse, ApiError } from '@verbatim/contracts';
+import type { Corpus } from '@prisma/client';
+import { db } from '@/lib/db';
+import {
+  keywordSearch,
+  toSearchResult,
+  extractSuggestedRoutes,
+  type SearchResult,
+  type SuggestedRoute,
+} from '@/lib/retrieval';
 
-// Force Node.js runtime (not Edge) for embedding operations
+// Force Node.js runtime
 export const runtime = 'nodejs';
+
+/** Request body shape */
+interface AskRequest {
+  workspaceId: string;
+  question: string;
+  conversationId?: string;
+  topK?: number;
+  corpusScope?: Array<'docs' | 'kb'>;
+}
+
+/** Response shape for retrieval-only mode */
+interface AskResponse {
+  question: string;
+  workspaceId: string;
+  conversationId: string;
+  results: SearchResult[];
+  suggestedRoutes: SuggestedRoute[];
+  debug: {
+    retrievalMode: 'vector' | 'keyword';
+    totalChunksScanned: number;
+    topK: number;
+    corpusScope: string[];
+  };
+}
+
+/** Error response shape */
+interface ApiError {
+  error: string;
+  code: string;
+  details?: Record<string, unknown>;
+}
+
+/** Default values */
+const DEFAULT_TOP_K = 8;
+const DEFAULT_CORPUS_SCOPE: Corpus[] = ['docs', 'kb'];
+const MAX_SUGGESTED_ROUTES = 5;
 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as AskRequest;
 
     // Validate required fields
-    if (!body.question || !body.workspaceId) {
-      const error: ApiError = {
-        error: 'Missing required fields: question, workspaceId',
-        code: 'VALIDATION_ERROR',
-      };
-      return NextResponse.json(error, { status: 400 });
+    if (!body.workspaceId) {
+      return errorResponse('Missing required field: workspaceId', 'VALIDATION_ERROR', 400);
+    }
+    if (!body.question) {
+      return errorResponse('Missing required field: question', 'VALIDATION_ERROR', 400);
     }
 
-    // TODO: Implement retrieval and answer generation
-    // 1. Retrieve relevant chunks from vector store
-    // 2. Generate answer with citations
-    // 3. Determine suggested routes
-    // 4. Assess confidence
-    // 5. Generate ticket draft if low confidence
+    const workspaceId = body.workspaceId;
+    const question = body.question.trim();
+    const conversationId = body.conversationId ?? crypto.randomUUID();
+    const topK = body.topK ?? DEFAULT_TOP_K;
+    const corpusScope = validateCorpusScope(body.corpusScope) ?? DEFAULT_CORPUS_SCOPE;
+
+    // Verify workspace exists
+    const workspace = await db.workspace.findUnique({
+      where: { id: workspaceId },
+    });
+
+    if (!workspace) {
+      return errorResponse(`Workspace not found: ${workspaceId}`, 'NOT_FOUND', 404);
+    }
+
+    // Perform keyword-based retrieval
+    // (Vector retrieval can replace this when embeddings are implemented)
+    const retrievedChunks = await keywordSearch({
+      workspaceId,
+      question,
+      topK,
+      corpusScope,
+    });
+
+    // Convert to search results with citations
+    const results: SearchResult[] = retrievedChunks.map(toSearchResult);
+
+    // Extract suggested routes from docs results only
+    const suggestedRoutes = extractSuggestedRoutes(retrievedChunks, MAX_SUGGESTED_ROUTES);
+
+    // Count total chunks for debug info
+    const totalChunks = await db.chunk.count({
+      where: {
+        document: {
+          workspaceId,
+          corpus: { in: corpusScope },
+        },
+      },
+    });
 
     const response: AskResponse = {
-      answer: 'Not implemented',
-      citations: [],
-      suggestedRoutes: [],
-      relatedRoutes: [],
-      confidence: { score: 0, label: 'low' },
-      conversationId: body.conversationId ?? crypto.randomUUID(),
+      question,
+      workspaceId,
+      conversationId,
+      results,
+      suggestedRoutes,
+      debug: {
+        retrievalMode: 'keyword', // Will change to 'vector' when embeddings are implemented
+        totalChunksScanned: totalChunks,
+        topK,
+        corpusScope: corpusScope as string[],
+      },
     };
 
     return NextResponse.json(response);
   } catch (error) {
-    const apiError: ApiError = {
-      error: 'Internal server error',
-      code: 'INTERNAL_ERROR',
-    };
-    return NextResponse.json(apiError, { status: 500 });
+    console.error('Ask endpoint error:', error);
+    return errorResponse(
+      'Internal server error',
+      'INTERNAL_ERROR',
+      500,
+      { message: error instanceof Error ? error.message : String(error) }
+    );
   }
+}
+
+/**
+ * Validate and normalize corpus scope.
+ */
+function validateCorpusScope(scope?: Array<'docs' | 'kb'>): Corpus[] | null {
+  if (!scope || !Array.isArray(scope)) {
+    return null;
+  }
+
+  const valid: Corpus[] = [];
+  for (const s of scope) {
+    if (s === 'docs' || s === 'kb') {
+      valid.push(s);
+    }
+  }
+
+  return valid.length > 0 ? valid : null;
+}
+
+/**
+ * Build an error response.
+ */
+function errorResponse(
+  message: string,
+  code: string,
+  status: number,
+  details?: Record<string, unknown>
+): NextResponse {
+  const error: ApiError = { error: message, code };
+  if (details) {
+    error.details = details;
+  }
+  return NextResponse.json(error, { status });
 }

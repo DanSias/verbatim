@@ -9,11 +9,18 @@
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev"
+    "db:migrate": "prisma migrate dev",
+    "ingest": "tsx scripts/bulk-ingest.ts"
   },
   "dependencies": {
     "@prisma/client": "^7.2.0",
     "@verbatim/contracts": "*",
+    "github-slugger": "^2.0.0",
+    "gray-matter": "^4.0.3",
+    "mdast-util-from-markdown": "^2.0.0",
+    "mdast-util-mdx": "^3.0.0",
+    "mdast-util-to-string": "^4.0.0",
+    "micromark-extension-mdxjs": "^3.0.0",
     "next": "^14.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
@@ -22,9 +29,11 @@
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
+    "dotenv": "^16.3.0",
     "eslint": "^8.55.0",
     "eslint-config-next": "^14.0.0",
     "prisma": "^7.2.0",
+    "tsx": "^4.7.0",
     "typescript": "^5.3.0"
   }
 }

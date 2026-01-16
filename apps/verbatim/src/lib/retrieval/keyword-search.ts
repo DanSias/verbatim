@@ -12,6 +12,7 @@
 
 import { db } from '@/lib/db';
 import type { Corpus } from '@prisma/client';
+import { tokenize, scoreChunk } from './scoring';
 
 /** A retrieved chunk with its score and metadata */
 export interface RetrievedChunk {
@@ -102,74 +103,4 @@ export async function keywordSearch(
     .slice(0, topK);
 }
 
-/**
- * Tokenize text into lowercase terms.
- * Removes punctuation and common stop words.
- */
-function tokenize(text: string): string[] {
-  // Convert to lowercase and split on non-word characters
-  const words = text.toLowerCase().split(/\W+/).filter(Boolean);
-
-  // Remove common stop words
-  const stopWords = new Set([
-    'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from',
-    'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'or', 'that',
-    'the', 'to', 'was', 'were', 'will', 'with', 'i', 'me', 'my',
-    'we', 'our', 'you', 'your', 'do', 'does', 'how', 'what', 'when',
-    'where', 'which', 'who', 'why', 'can', 'could', 'would', 'should',
-  ]);
-
-  return words.filter((w) => w.length > 1 && !stopWords.has(w));
-}
-
-/**
- * Score a chunk based on term overlap with query terms.
- *
- * Scoring factors:
- * - Term frequency in content
- * - Bonus for matches in headingPath
- * - Normalize by content length to avoid bias toward longer chunks
- */
-function scoreChunk(
-  content: string,
-  headingPath: string[],
-  queryTerms: string[]
-): number {
-  const contentLower = content.toLowerCase();
-  const headingText = headingPath.join(' ').toLowerCase();
-
-  let score = 0;
-
-  for (const term of queryTerms) {
-    // Count occurrences in content
-    const contentMatches = countOccurrences(contentLower, term);
-    score += contentMatches;
-
-    // Bonus for heading matches (headings are important context)
-    if (headingText.includes(term)) {
-      score += 2;
-    }
-  }
-
-  // Normalize by sqrt of content length to reduce bias toward long chunks
-  // but still give some credit to comprehensive content
-  const lengthFactor = Math.sqrt(content.length / 1000);
-  if (lengthFactor > 0) {
-    score = score / lengthFactor;
-  }
-
-  return score;
-}
-
-/**
- * Count occurrences of a term in text.
- */
-function countOccurrences(text: string, term: string): number {
-  let count = 0;
-  let pos = 0;
-  while ((pos = text.indexOf(term, pos)) !== -1) {
-    count++;
-    pos += term.length;
-  }
-  return count;
-}
+// Pure scoring functions are imported from ./scoring.ts

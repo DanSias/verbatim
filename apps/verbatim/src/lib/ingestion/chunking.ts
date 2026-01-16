@@ -124,7 +124,7 @@ function splitByH2(content: string): Section[] {
   const slugger = new GithubSlugger();
 
   let currentSection: Section | null = null;
-  let preambleLines: string[] = [];
+  const preambleLines: string[] = [];
 
   for (const line of lines) {
     const h2Match = line.match(/^##\s+(.+)$/);

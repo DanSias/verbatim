@@ -5,11 +5,18 @@
  * Uses retrieval internally and synthesizes a citation-backed answer.
  * Includes deterministic confidence scoring and ticket draft fallback.
  *
+ * Hardening features:
+ * - Request validation with zod schemas
+ * - LLM timeout with AbortController
+ * - In-memory rate limiting (pilot-safe)
+ * - Structured logging
+ * - Defensive caps on token usage and retrieval size
+ *
  * Request:
  *   - workspaceId: string (required)
  *   - question: string (required)
  *   - corpusScope?: Array<'docs'|'kb'> (default both)
- *   - topK?: number (default 6)
+ *   - topK?: number (default 6, max 10)
  *   - provider?: 'gemini' | 'openai' | 'anthropic' (optional override)
  *   - conversationId?: string (echoed back)
  *   - forceTicketDraft?: boolean (default false)
@@ -24,12 +31,16 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import type { Corpus } from '@prisma/client';
 import { retrieve, RetrievalError, type RetrievedChunk } from '@/lib/retrieval';
 import {
   getLLMClient,
   getDefaultProvider,
-  isValidProvider,
+  withLLMTimeout,
+  getLLMTimeout,
+  getLLMCaps,
+  limitChunks,
+  truncateExcerpt,
+  LLMTimeoutError,
   type LLMProviderName,
   type LLMMessage,
 } from '@/lib/llm';
@@ -43,21 +54,29 @@ import {
   type AnswerMode,
   type AnswerDebug,
 } from '@/lib/answer';
+import {
+  parseAnswerRequest,
+  applyRateLimit,
+  getClientIp,
+  invalidJsonError,
+  validationError,
+  rateLimitError,
+  llmTimeoutError,
+  llmError,
+  notFoundError,
+  internalError,
+} from '@/lib/http';
+import {
+  generateRequestId,
+  truncateText,
+  logRequestStart,
+  logRequestEnd,
+  logRateLimit,
+  formatTopCitations,
+} from '@/lib/observability/log';
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
-
-/** Request body shape */
-interface AnswerRequest {
-  workspaceId: string;
-  question: string;
-  corpusScope?: Array<'docs' | 'kb'>;
-  topK?: number;
-  provider?: string;
-  conversationId?: string;
-  forceTicketDraft?: boolean;
-  minConfidence?: ConfidenceLevel;
-}
 
 /** Response shape */
 interface AnswerResponse {
@@ -72,56 +91,77 @@ interface AnswerResponse {
   debug: AnswerDebug;
 }
 
-/** Error response shape */
-interface ApiError {
-  error: string;
-  code: string;
-  details?: Record<string, unknown>;
-}
-
-/** Default values */
-const DEFAULT_TOP_K = 6;
-const DEFAULT_CORPUS_SCOPE: Corpus[] = ['docs', 'kb'];
-
 export async function POST(request: NextRequest) {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+  let workspaceId: string | undefined;
+  let providerName: LLMProviderName = getDefaultProvider();
+
   try {
-    const body = (await request.json()) as AnswerRequest;
-
-    // Validate required fields
-    if (!body.workspaceId) {
-      return errorResponse('Missing required field: workspaceId', 'VALIDATION_ERROR', 400);
-    }
-    if (!body.question) {
-      return errorResponse('Missing required field: question', 'VALIDATION_ERROR', 400);
-    }
-
-    const workspaceId = body.workspaceId;
-    const question = body.question.trim();
-    const topK = body.topK ?? DEFAULT_TOP_K;
-    const corpusScope = validateCorpusScope(body.corpusScope) ?? DEFAULT_CORPUS_SCOPE;
-    const forceTicketDraft = body.forceTicketDraft ?? false;
-    const minConfidence = validateConfidenceLevel(body.minConfidence);
-
-    // Validate and select provider
-    let providerName: LLMProviderName = getDefaultProvider();
-    if (body.provider) {
-      if (!isValidProvider(body.provider)) {
-        return errorResponse(
-          `Invalid provider: ${body.provider}. Valid options: gemini, openai, anthropic`,
-          'VALIDATION_ERROR',
-          400
-        );
+    // Parse and validate request body
+    const parseResult = await parseAnswerRequest(request);
+    if (!parseResult.success) {
+      // Determine if it's a JSON parse error or validation error
+      const isJsonError = parseResult.error.includes('Invalid JSON') || parseResult.error.includes('empty');
+      if (isJsonError) {
+        return invalidJsonError(parseResult.details);
       }
-      providerName = body.provider;
+      return validationError(parseResult.error, parseResult.details);
     }
+
+    const {
+      workspaceId: wsId,
+      question,
+      topK,
+      corpusScope,
+      provider,
+      forceTicketDraft,
+      minConfidence,
+    } = parseResult.data;
+
+    workspaceId = wsId;
+    if (provider) {
+      providerName = provider;
+    }
+
+    // Apply rate limiting
+    const rateLimitResult = applyRateLimit(request, workspaceId);
+    if (!rateLimitResult.allowed) {
+      logRateLimit('answer', {
+        requestId,
+        ip: getClientIp(request),
+        workspaceId,
+        current: rateLimitResult.current,
+        limit: rateLimitResult.limit,
+      });
+
+      return rateLimitError(
+        rateLimitResult.retryAfterSeconds,
+        rateLimitResult.limit,
+        rateLimitResult.remaining,
+        rateLimitResult.resetTimestamp
+      );
+    }
+
+    // Log request start
+    logRequestStart('answer', {
+      requestId,
+      workspaceId,
+      questionLength: question.length,
+      questionPreview: truncateText(question, 80),
+      corpusScope: corpusScope as string[],
+      topK,
+    });
 
     // Run retrieval
+    const retrievalStartTime = Date.now();
     const retrieval = await retrieve({
       workspaceId,
       question,
       topK,
       corpusScope,
     });
+    const retrievalLatencyMs = Date.now() - retrievalStartTime;
 
     // Compute confidence from retrieval results
     const { confidence, signals } = computeConfidence(
@@ -147,7 +187,7 @@ export async function POST(request: NextRequest) {
         citations: [],
       });
 
-      return NextResponse.json({
+      const response: AnswerResponse = {
         question,
         workspaceId,
         answer: "I couldn't find any relevant information in the documentation to answer your question.",
@@ -165,16 +205,52 @@ export async function POST(request: NextRequest) {
           chunksUsed: 0,
           confidenceSignals: signals,
         },
-      } satisfies AnswerResponse);
+      };
+
+      logRequestEnd('answer', {
+        requestId,
+        workspaceId,
+        latencyMs: Date.now() - startTime,
+        retrievalLatencyMs,
+        provider: providerName,
+        model: 'n/a',
+        mode: 'ticket_draft',
+        confidence: 'low',
+        chunksUsed: 0,
+      });
+
+      return NextResponse.json(response);
     }
 
-    // Build prompt and call LLM
-    const { answer, citations, model } = await generateAnswer(
-      question,
-      retrieval.chunks,
-      providerName,
-      mode
-    );
+    // Build prompt and call LLM with timeout
+    const llmStartTime = Date.now();
+    let answer: string;
+    let citations: AnswerCitation[];
+    let model: string;
+    let didTimeout = false;
+
+    try {
+      const llmResult = await generateAnswerWithTimeout(
+        question,
+        retrieval.chunks,
+        providerName,
+        mode
+      );
+      answer = llmResult.answer;
+      citations = llmResult.citations;
+      model = llmResult.model;
+    } catch (error) {
+      if (error instanceof LLMTimeoutError) {
+        didTimeout = true;
+        // Fall back to deterministic response on timeout
+        answer = generateFallbackAnswer(retrieval.chunks, mode);
+        citations = generateFallbackCitations(retrieval.chunks);
+        model = 'fallback (timeout)';
+      } else {
+        throw error;
+      }
+    }
+    const llmLatencyMs = Date.now() - llmStartTime;
 
     // Ensure we have citations (fallback to deterministic if parsing failed)
     const finalCitations =
@@ -210,25 +286,77 @@ export async function POST(request: NextRequest) {
         corpusScope: corpusScope as string[],
         chunksUsed: retrieval.chunks.length,
         confidenceSignals: signals,
+        ...(didTimeout && { timeout: true }),
       },
     };
 
+    // Log request end
+    logRequestEnd('answer', {
+      requestId,
+      workspaceId,
+      latencyMs: Date.now() - startTime,
+      retrievalLatencyMs,
+      llmLatencyMs,
+      provider: providerName,
+      model,
+      mode,
+      confidence,
+      chunksUsed: retrieval.chunks.length,
+      topCitations: formatTopCitations(finalCitations),
+      timeout: didTimeout,
+    });
+
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Answer endpoint error:', error);
+    const latencyMs = Date.now() - startTime;
 
-    if (error instanceof RetrievalError) {
-      const status = error.code === 'NOT_FOUND' ? 404 : 500;
-      return errorResponse(error.message, error.code, status);
+    // Log error
+    logRequestEnd('answer', {
+      requestId,
+      workspaceId: workspaceId || 'unknown',
+      latencyMs,
+      error: error instanceof Error ? error.message : String(error),
+      errorCode: error instanceof RetrievalError ? error.code : 'INTERNAL_ERROR',
+    });
+
+    if (error instanceof LLMTimeoutError) {
+      return llmTimeoutError(getLLMTimeout(), {
+        requestId,
+        provider: providerName,
+      });
     }
 
-    return errorResponse(
-      'Internal server error',
-      'INTERNAL_ERROR',
-      500,
-      { message: error instanceof Error ? error.message : String(error) }
-    );
+    if (error instanceof RetrievalError) {
+      if (error.code === 'NOT_FOUND') {
+        return notFoundError(error.message, { requestId });
+      }
+      return internalError(error.message, { requestId, code: error.code });
+    }
+
+    // Check for LLM-specific errors
+    if (error instanceof Error && error.message.includes('API error')) {
+      return llmError(error.message, { requestId, provider: providerName });
+    }
+
+    return internalError('Internal server error', {
+      requestId,
+      message: error instanceof Error ? error.message : String(error),
+    });
   }
+}
+
+/**
+ * Generate an answer using the LLM with timeout protection.
+ */
+async function generateAnswerWithTimeout(
+  question: string,
+  chunks: RetrievedChunk[],
+  providerName: LLMProviderName,
+  mode: AnswerMode
+): Promise<{ answer: string; citations: AnswerCitation[]; model: string }> {
+  return withLLMTimeout(async (signal) => {
+    return generateAnswer(question, chunks, providerName, mode, signal);
+  });
 }
 
 /**
@@ -238,10 +366,16 @@ async function generateAnswer(
   question: string,
   chunks: RetrievedChunk[],
   providerName: LLMProviderName,
-  mode: AnswerMode
+  mode: AnswerMode,
+  signal?: AbortSignal
 ): Promise<{ answer: string; citations: AnswerCitation[]; model: string }> {
-  // Build source context for the LLM
-  const sourcesText = chunks
+  const caps = getLLMCaps();
+
+  // Apply defensive caps: limit chunks and truncate excerpts
+  const limitedChunks = limitChunks(chunks, caps.maxChunks);
+
+  // Build source context for the LLM with truncated excerpts
+  const sourcesText = limitedChunks
     .map((chunk, i) => {
       const sourceNum = i + 1;
       const location =
@@ -249,11 +383,12 @@ async function generateAnswer(
           ? `[Docs] ${chunk.route || '/'}${chunk.anchor ? '#' + chunk.anchor : ''}`
           : `[KB] ${chunk.sourcePath}`;
       const heading = chunk.headingPath.length > 0 ? chunk.headingPath.join(' > ') : 'No heading';
+      const content = truncateExcerpt(chunk.content, caps.maxExcerptChars);
 
       return `[${sourceNum}] ${location}
 Heading: ${heading}
 Content:
-${chunk.content.slice(0, 1500)}${chunk.content.length > 1500 ? '...' : ''}
+${content}
 `;
     })
     .join('\n---\n');
@@ -267,15 +402,16 @@ ${chunk.content.slice(0, 1500)}${chunk.content.length > 1500 ? '...' : ''}
     { role: 'user', content: userPrompt },
   ];
 
-  // Call LLM
+  // Call LLM with caps
   const client = getLLMClient(providerName);
   const result = await client.generateText(messages, {
-    temperature: 0.3,
-    maxTokens: 1024,
+    temperature: caps.temperature,
+    maxTokens: caps.maxTokens,
+    signal,
   });
 
   // Parse citations from the answer
-  const citations = extractCitationsFromAnswer(result.text, chunks);
+  const citations = extractCitationsFromAnswer(result.text, limitedChunks);
 
   // Get model name from provider
   const model = getModelName(providerName, result.raw);
@@ -336,6 +472,27 @@ ${sourcesText}
 QUESTION: ${question}
 
 Please provide a concise answer with citations.`;
+}
+
+/**
+ * Generate a fallback answer when LLM times out or fails.
+ */
+function generateFallbackAnswer(chunks: RetrievedChunk[], mode: AnswerMode): string {
+  if (chunks.length === 0) {
+    return "I couldn't find any relevant information in the documentation to answer your question.";
+  }
+
+  const topChunk = chunks[0];
+  const location =
+    topChunk.corpus === 'docs'
+      ? topChunk.route || '/'
+      : topChunk.sourcePath;
+
+  if (mode === 'ticket_draft') {
+    return `I found some potentially relevant information at ${location} [1], but I wasn't able to generate a complete answer. Please review the source or contact support for more help.`;
+  }
+
+  return `Based on the available documentation, you may find relevant information at ${location} [1]. For a more detailed answer, please try again or consult the documentation directly.`;
 }
 
 /**
@@ -445,49 +602,4 @@ function getModelName(providerName: LLMProviderName, raw: unknown): string {
     default:
       return 'unknown';
   }
-}
-
-/**
- * Validate and normalize corpus scope.
- */
-function validateCorpusScope(scope?: Array<'docs' | 'kb'>): Corpus[] | null {
-  if (!scope || !Array.isArray(scope)) {
-    return null;
-  }
-
-  const valid: Corpus[] = [];
-  for (const s of scope) {
-    if (s === 'docs' || s === 'kb') {
-      valid.push(s);
-    }
-  }
-
-  return valid.length > 0 ? valid : null;
-}
-
-/**
- * Validate confidence level parameter.
- */
-function validateConfidenceLevel(level?: string): ConfidenceLevel | undefined {
-  if (!level) return undefined;
-  if (level === 'high' || level === 'medium' || level === 'low') {
-    return level;
-  }
-  return undefined;
-}
-
-/**
- * Build an error response.
- */
-function errorResponse(
-  message: string,
-  code: string,
-  status: number,
-  details?: Record<string, unknown>
-): NextResponse {
-  const error: ApiError = { error: message, code };
-  if (details) {
-    error.details = details;
-  }
-  return NextResponse.json(error, { status });
 }

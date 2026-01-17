@@ -79,6 +79,7 @@ export function createOpenAIProvider(apiKey: string, defaultModel?: string): LLM
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(requestBody),
+        signal: options?.signal,
       });
 
       const data: OpenAIResponse = await response.json();

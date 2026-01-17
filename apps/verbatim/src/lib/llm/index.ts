@@ -41,6 +41,23 @@ export type {
   LLMGenerateResult,
 };
 
+// Re-export timeout utilities
+export {
+  withTimeout,
+  withLLMTimeout,
+  getLLMTimeout,
+  LLMTimeoutError,
+  LLMAbortError,
+} from './timeout';
+
+// Re-export config utilities
+export {
+  getLLMCaps,
+  truncateExcerpt,
+  limitChunks,
+  type LLMCaps,
+} from './config';
+
 /** Default provider when not specified */
 const DEFAULT_PROVIDER: LLMProviderName = 'gemini';
 

@@ -118,13 +118,14 @@ export function createGeminiProvider(apiKey: string, defaultModel?: string): LLM
         }
       }
 
-      // Make request
+      // Make request with optional abort signal
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
+        signal: options?.signal,
       });
 
       const data: GeminiResponse = await response.json();

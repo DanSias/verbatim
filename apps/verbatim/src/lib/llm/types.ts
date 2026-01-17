@@ -25,6 +25,8 @@ export interface LLMGenerateOptions {
   temperature?: number;
   /** Maximum tokens to generate */
   maxTokens?: number;
+  /** AbortSignal for cancellation/timeout */
+  signal?: AbortSignal;
 }
 
 /** Result from text generation */

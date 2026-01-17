@@ -88,6 +88,7 @@ export function createAnthropicProvider(apiKey: string, defaultModel?: string): 
           'anthropic-version': API_VERSION,
         },
         body: JSON.stringify(requestBody),
+        signal: options?.signal,
       });
 
       const data: AnthropicResponse = await response.json();

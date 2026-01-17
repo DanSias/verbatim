@@ -5,8 +5,8 @@
  * Injects server-side configuration and forwards to /api/answer.
  *
  * This route is designed to be portable:
- * - In Verbatim: forwards to local /api/answer
- * - In docs repo: forward to VERBATIM_BASE_URL/api/answer
+ * - In Verbatim: WIDGET_UPSTREAM_MODE=local forwards to local /api/answer
+ * - In docs repo: WIDGET_UPSTREAM_MODE=remote forwards to VERBATIM_BASE_URL/api/answer
  *
  * Client request (simplified):
  *   - question: string (required)
@@ -17,8 +17,10 @@
  *   - provider?: 'openai'|'gemini'|'anthropic'
  *
  * Server-injected from env:
- *   - workspaceId from WIDGET_DEFAULT_WORKSPACE_ID (required)
+ *   - workspaceId from header x-verbatim-workspace-id or WIDGET_DEFAULT_WORKSPACE_ID
  *   - Default values for corpusScope, minConfidence, provider
+ *
+ * IMPORTANT: This route ALWAYS returns JSON, never HTML errors.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -26,9 +28,14 @@ import {
   invalidJsonError,
   validationError,
   internalError,
+  jsonError,
+  type ErrorCode,
 } from '@/lib/http';
 
 export const runtime = 'nodejs';
+
+/** Upstream timeout in milliseconds */
+const UPSTREAM_TIMEOUT_MS = 20000;
 
 /** Client request body shape */
 interface WidgetRequest {
@@ -40,9 +47,12 @@ interface WidgetRequest {
   provider?: 'openai' | 'gemini' | 'anthropic';
 }
 
+/** Upstream mode configuration */
+type UpstreamMode = 'local' | 'remote';
+
 /** Get widget configuration from environment */
 function getWidgetConfig() {
-  const workspaceId = process.env.WIDGET_DEFAULT_WORKSPACE_ID;
+  const defaultWorkspaceId = process.env.WIDGET_DEFAULT_WORKSPACE_ID;
   const corpusScopeEnv = process.env.WIDGET_DEFAULT_CORPUS_SCOPE;
   const minConfidence = process.env.WIDGET_DEFAULT_MIN_CONFIDENCE as
     | 'low'
@@ -55,6 +65,11 @@ function getWidgetConfig() {
     | 'anthropic'
     | undefined;
 
+  // Upstream configuration
+  const upstreamMode = (process.env.WIDGET_UPSTREAM_MODE || 'local') as UpstreamMode;
+  const verbatimBaseUrl = process.env.VERBATIM_BASE_URL;
+  const verbatimApiKey = process.env.VERBATIM_API_KEY;
+
   // Parse corpus scope from comma-separated string
   let corpusScope: Array<'docs' | 'kb'> | undefined;
   if (corpusScopeEnv) {
@@ -65,7 +80,85 @@ function getWidgetConfig() {
     }
   }
 
-  return { workspaceId, corpusScope, minConfidence, provider };
+  return {
+    defaultWorkspaceId,
+    corpusScope,
+    minConfidence,
+    provider,
+    upstreamMode,
+    verbatimBaseUrl,
+    verbatimApiKey,
+  };
+}
+
+/**
+ * Resolve workspace ID from request header or env default.
+ * Header takes precedence for pilot testing.
+ */
+function resolveWorkspaceId(request: NextRequest, defaultWorkspaceId?: string): string | null {
+  // Check for pilot override header
+  const headerWorkspaceId = request.headers.get('x-verbatim-workspace-id');
+  if (headerWorkspaceId && headerWorkspaceId.trim()) {
+    return headerWorkspaceId.trim();
+  }
+
+  // Fall back to env default
+  if (defaultWorkspaceId && defaultWorkspaceId.trim()) {
+    return defaultWorkspaceId.trim();
+  }
+
+  return null;
+}
+
+/**
+ * Build upstream URL based on mode.
+ */
+function buildUpstreamUrl(
+  request: NextRequest,
+  mode: UpstreamMode,
+  verbatimBaseUrl?: string
+): { url: string; error?: never } | { url?: never; error: string } {
+  if (mode === 'remote') {
+    if (!verbatimBaseUrl) {
+      return { error: 'VERBATIM_BASE_URL is required when WIDGET_UPSTREAM_MODE=remote' };
+    }
+    // Ensure no trailing slash
+    const baseUrl = verbatimBaseUrl.replace(/\/+$/, '');
+    return { url: `${baseUrl}/api/answer` };
+  }
+
+  // Local mode: use relative URL
+  const url = new URL('/api/answer', request.url);
+  return { url: url.toString() };
+}
+
+/**
+ * Safely parse JSON response, returning error details if parsing fails.
+ */
+async function safeParseJsonResponse(
+  response: Response
+): Promise<{ data: unknown; error?: never } | { data?: never; error: string; snippet: string }> {
+  try {
+    const text = await response.text();
+
+    // Try to parse as JSON
+    try {
+      const data = JSON.parse(text);
+      return { data };
+    } catch {
+      // Not JSON - return truncated snippet
+      const snippet = text.length > 500 ? text.slice(0, 500) + '...' : text;
+      return {
+        error: 'Upstream returned non-JSON response',
+        snippet,
+      };
+    }
+  } catch (err) {
+    return {
+      error: 'Failed to read upstream response',
+      snippet: err instanceof Error ? err.message : 'Unknown error',
+    };
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -73,9 +166,20 @@ export async function POST(request: NextRequest) {
     // Get server-side config
     const config = getWidgetConfig();
 
-    if (!config.workspaceId) {
-      return internalError('Widget not configured: WIDGET_DEFAULT_WORKSPACE_ID is required');
+    // Resolve workspace ID (header override or env default)
+    const workspaceId = resolveWorkspaceId(request, config.defaultWorkspaceId);
+    if (!workspaceId) {
+      return validationError(
+        'workspaceId is required: set WIDGET_DEFAULT_WORKSPACE_ID or pass x-verbatim-workspace-id header'
+      );
     }
+
+    // Build upstream URL
+    const upstreamResult = buildUpstreamUrl(request, config.upstreamMode, config.verbatimBaseUrl);
+    if (upstreamResult.error) {
+      return internalError(upstreamResult.error);
+    }
+    const upstreamUrl = upstreamResult.url;
 
     // Parse client request
     let body: WidgetRequest;
@@ -137,7 +241,7 @@ export async function POST(request: NextRequest) {
 
     // Build upstream request, applying defaults from config
     const upstreamBody = {
-      workspaceId: config.workspaceId,
+      workspaceId,
       question,
       topK,
       corpusScope: corpusScope ?? config.corpusScope,
@@ -146,22 +250,67 @@ export async function POST(request: NextRequest) {
       provider: provider ?? config.provider,
     };
 
-    // Forward to /api/answer using relative URL
-    // This allows the same code to work regardless of host/port
-    const upstreamUrl = new URL('/api/answer', request.url);
+    // Build headers
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
 
-    const upstreamResponse = await fetch(upstreamUrl.toString(), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(upstreamBody),
-    });
+    // Add API key for remote mode if configured
+    if (config.verbatimApiKey) {
+      headers['Authorization'] = `Bearer ${config.verbatimApiKey}`;
+    }
 
-    // Forward the response (including error responses)
-    const responseData = await upstreamResponse.json();
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 
-    return NextResponse.json(responseData, {
+    let upstreamResponse: Response;
+    try {
+      upstreamResponse = await fetch(upstreamUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(upstreamBody),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      clearTimeout(timeoutId);
+
+      // Check if it was an abort (timeout)
+      if (err instanceof Error && err.name === 'AbortError') {
+        return jsonError(
+          'UPSTREAM_TIMEOUT' as ErrorCode,
+          `Upstream request timed out after ${UPSTREAM_TIMEOUT_MS}ms`,
+          504,
+          { timeoutMs: UPSTREAM_TIMEOUT_MS }
+        );
+      }
+
+      // Network error
+      return internalError('Failed to connect to upstream', {
+        message: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    // Parse upstream response safely (always return JSON)
+    const parseResult = await safeParseJsonResponse(upstreamResponse);
+
+    if (parseResult.error) {
+      // Upstream returned non-JSON (e.g., HTML error page)
+      return jsonError(
+        'UPSTREAM_ERROR' as ErrorCode,
+        parseResult.error,
+        502,
+        {
+          upstreamStatus: upstreamResponse.status,
+          snippet: parseResult.snippet,
+        }
+      );
+    }
+
+    // Forward the JSON response (including error responses)
+    return NextResponse.json(parseResult.data, {
       status: upstreamResponse.status,
       headers: {
         // Forward rate limit headers if present

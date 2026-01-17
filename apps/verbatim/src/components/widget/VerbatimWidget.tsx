@@ -101,8 +101,17 @@ const confidenceColors = {
   low: 'bg-red-100 text-red-800 border-red-200',
 };
 
+/** Widget props */
+interface VerbatimWidgetProps {
+  /**
+   * Optional headers to include with API requests.
+   * Use this to pass custom headers like x-verbatim-workspace-id for pilot testing.
+   */
+  requestHeaders?: Record<string, string>;
+}
+
 /** Main widget component */
-export function VerbatimWidget() {
+export function VerbatimWidget({ requestHeaders }: VerbatimWidgetProps = {}) {
   // Check if widget is enabled
   const isEnabled = process.env.NEXT_PUBLIC_WIDGET_ENABLED === '1';
 
@@ -145,7 +154,10 @@ export function VerbatimWidget() {
       try {
         const res = await fetch('/api/widget/answer', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...requestHeaders,
+          },
           body: JSON.stringify({ question: question.trim() }),
         });
 
@@ -166,7 +178,7 @@ export function VerbatimWidget() {
         setIsLoading(false);
       }
     },
-    [question, isLoading]
+    [question, isLoading, requestHeaders]
   );
 
   const handleCopyTicketDraft = useCallback(() => {

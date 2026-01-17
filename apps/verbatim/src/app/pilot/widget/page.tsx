@@ -5,10 +5,15 @@
  *
  * Demonstrates the documentation assistant widget that will
  * eventually be embedded in the docs site.
+ *
+ * Includes workspace override for pilot testing different workspaces.
  */
 
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { VerbatimWidget } from '@/components/widget';
+
+/** LocalStorage key for persisting workspace override */
+const WORKSPACE_OVERRIDE_KEY = 'verbatim-pilot-workspace-override';
 
 /** Response type for inline testing form */
 interface WidgetResponse {
@@ -22,6 +27,38 @@ interface WidgetResponse {
 }
 
 export default function WidgetDemoPage() {
+  // Workspace override state
+  const [workspaceOverride, setWorkspaceOverride] = useState('');
+  const [savedWorkspace, setSavedWorkspace] = useState('');
+
+  // Load saved workspace on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(WORKSPACE_OVERRIDE_KEY) || '';
+    setWorkspaceOverride(saved);
+    setSavedWorkspace(saved);
+  }, []);
+
+  // Save workspace to localStorage
+  const handleSaveWorkspace = () => {
+    const trimmed = workspaceOverride.trim();
+    localStorage.setItem(WORKSPACE_OVERRIDE_KEY, trimmed);
+    setSavedWorkspace(trimmed);
+  };
+
+  // Clear workspace override
+  const handleClearWorkspace = () => {
+    setWorkspaceOverride('');
+    setSavedWorkspace('');
+    localStorage.removeItem(WORKSPACE_OVERRIDE_KEY);
+  };
+
+  // Build request headers for widget
+  const widgetHeaders: Record<string, string> = {};
+  if (savedWorkspace) {
+    widgetHeaders['x-verbatim-workspace-id'] = savedWorkspace;
+  }
+
+  // API test form state
   const [testQuestion, setTestQuestion] = useState('');
   const [testLoading, setTestLoading] = useState(false);
   const [testResponse, setTestResponse] = useState<WidgetResponse | null>(null);
@@ -36,7 +73,10 @@ export default function WidgetDemoPage() {
     try {
       const res = await fetch('/api/widget/answer', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...widgetHeaders,
+        },
         body: JSON.stringify({ question: testQuestion.trim() }),
       });
 
@@ -81,6 +121,45 @@ export default function WidgetDemoPage() {
               : 'Set NEXT_PUBLIC_WIDGET_ENABLED=1 to enable the widget.'}
           </span>
         </div>
+      </div>
+
+      {/* Workspace Override (Pilot Testing) */}
+      <div className="mb-8 p-4 rounded-lg border border-purple-200 bg-purple-50">
+        <h2 className="text-lg font-semibold text-purple-900 mb-2">Workspace Override</h2>
+        <p className="text-sm text-purple-700 mb-3">
+          Override the workspace ID for testing. This sends{' '}
+          <code className="bg-purple-100 px-1 rounded">x-verbatim-workspace-id</code> header with requests.
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={workspaceOverride}
+            onChange={(e) => setWorkspaceOverride(e.target.value)}
+            placeholder="Enter workspace ID to override..."
+            className="flex-1 px-3 py-2 border border-purple-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+          />
+          <button
+            onClick={handleSaveWorkspace}
+            disabled={workspaceOverride === savedWorkspace}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white text-sm font-medium rounded-md transition-colors"
+          >
+            Save
+          </button>
+          <button
+            onClick={handleClearWorkspace}
+            disabled={!savedWorkspace && !workspaceOverride}
+            className="px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-300 text-white text-sm font-medium rounded-md transition-colors"
+          >
+            Clear
+          </button>
+        </div>
+        {savedWorkspace && (
+          <div className="mt-2 flex items-center gap-2">
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-200 text-purple-900">
+              Active: {savedWorkspace}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Architecture Overview */}
@@ -170,7 +249,7 @@ NEXT_PUBLIC_WIDGET_ENABLED=1`}
       </div>
 
       {/* Widget Component */}
-      <VerbatimWidget />
+      <VerbatimWidget requestHeaders={widgetHeaders} />
     </div>
   );
 }

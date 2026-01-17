@@ -3,6 +3,7 @@
  *
  * LLM-powered answer synthesis endpoint for Verbatim.
  * Uses retrieval internally and synthesizes a citation-backed answer.
+ * Includes deterministic confidence scoring and ticket draft fallback.
  *
  * Request:
  *   - workspaceId: string (required)
@@ -11,9 +12,15 @@
  *   - topK?: number (default 6)
  *   - provider?: 'gemini' | 'openai' | 'anthropic' (optional override)
  *   - conversationId?: string (echoed back)
+ *   - forceTicketDraft?: boolean (default false)
+ *   - minConfidence?: 'high' | 'medium' | 'low' (optional threshold)
  *
  * Response:
- *   - question, workspaceId, answer, citations, suggestedRoutes, debug
+ *   - question, workspaceId, answer, citations, suggestedRoutes
+ *   - confidence: 'high' | 'medium' | 'low'
+ *   - mode: 'answer' | 'ticket_draft'
+ *   - ticketDraft?: TicketDraft (when mode is ticket_draft)
+ *   - debug: includes confidenceSignals
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -26,6 +33,16 @@ import {
   type LLMProviderName,
   type LLMMessage,
 } from '@/lib/llm';
+import {
+  computeConfidence,
+  meetsConfidenceThreshold,
+  generateTicketDraft,
+  type ConfidenceLevel,
+  type AnswerCitation,
+  type TicketDraft,
+  type AnswerMode,
+  type AnswerDebug,
+} from '@/lib/answer';
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
@@ -38,16 +55,8 @@ interface AnswerRequest {
   topK?: number;
   provider?: string;
   conversationId?: string;
-}
-
-/** Citation in the response */
-interface AnswerCitation {
-  index: number;
-  corpus: 'docs' | 'kb';
-  route?: string;
-  anchor?: string | null;
-  url?: string;
-  sourcePath?: string;
+  forceTicketDraft?: boolean;
+  minConfidence?: ConfidenceLevel;
 }
 
 /** Response shape */
@@ -57,14 +66,10 @@ interface AnswerResponse {
   answer: string;
   citations: AnswerCitation[];
   suggestedRoutes: Array<{ route: string; title: string | null }>;
-  debug: {
-    provider: string;
-    model: string;
-    retrievalMode: 'vector' | 'keyword';
-    topK: number;
-    corpusScope: string[];
-    chunksUsed: number;
-  };
+  confidence: ConfidenceLevel;
+  mode: AnswerMode;
+  ticketDraft?: TicketDraft;
+  debug: AnswerDebug;
 }
 
 /** Error response shape */
@@ -94,6 +99,8 @@ export async function POST(request: NextRequest) {
     const question = body.question.trim();
     const topK = body.topK ?? DEFAULT_TOP_K;
     const corpusScope = validateCorpusScope(body.corpusScope) ?? DEFAULT_CORPUS_SCOPE;
+    const forceTicketDraft = body.forceTicketDraft ?? false;
+    const minConfidence = validateConfidenceLevel(body.minConfidence);
 
     // Validate and select provider
     let providerName: LLMProviderName = getDefaultProvider();
@@ -116,14 +123,39 @@ export async function POST(request: NextRequest) {
       corpusScope,
     });
 
+    // Compute confidence from retrieval results
+    const { confidence, signals } = computeConfidence(
+      retrieval.results,
+      retrieval.suggestedRoutes
+    );
+
+    // Determine mode based on confidence and request params
+    const shouldUseTicketDraft =
+      forceTicketDraft ||
+      confidence === 'low' ||
+      (minConfidence && !meetsConfidenceThreshold(confidence, minConfidence));
+
+    const mode: AnswerMode = shouldUseTicketDraft ? 'ticket_draft' : 'answer';
+
     // Check if we have enough sources
     if (retrieval.chunks.length === 0) {
+      // No sources - generate ticket draft
+      const ticketDraft = generateTicketDraft({
+        question,
+        chunks: [],
+        answer: undefined,
+        citations: [],
+      });
+
       return NextResponse.json({
         question,
         workspaceId,
         answer: "I couldn't find any relevant information in the documentation to answer your question.",
         citations: [],
         suggestedRoutes: [],
+        confidence: 'low',
+        mode: 'ticket_draft',
+        ticketDraft,
         debug: {
           provider: providerName,
           model: 'n/a',
@@ -131,6 +163,7 @@ export async function POST(request: NextRequest) {
           topK,
           corpusScope: corpusScope as string[],
           chunksUsed: 0,
+          confidenceSignals: signals,
         },
       } satisfies AnswerResponse);
     }
@@ -139,15 +172,36 @@ export async function POST(request: NextRequest) {
     const { answer, citations, model } = await generateAnswer(
       question,
       retrieval.chunks,
-      providerName
+      providerName,
+      mode
     );
+
+    // Ensure we have citations (fallback to deterministic if parsing failed)
+    const finalCitations =
+      citations.length > 0
+        ? citations
+        : generateFallbackCitations(retrieval.chunks);
+
+    // Generate ticket draft if needed
+    let ticketDraft: TicketDraft | undefined;
+    if (mode === 'ticket_draft') {
+      ticketDraft = generateTicketDraft({
+        question,
+        chunks: retrieval.chunks,
+        answer,
+        citations: finalCitations,
+      });
+    }
 
     const response: AnswerResponse = {
       question,
       workspaceId,
       answer,
-      citations,
+      citations: finalCitations,
       suggestedRoutes: retrieval.suggestedRoutes,
+      confidence,
+      mode,
+      ticketDraft,
       debug: {
         provider: providerName,
         model,
@@ -155,6 +209,7 @@ export async function POST(request: NextRequest) {
         topK,
         corpusScope: corpusScope as string[],
         chunksUsed: retrieval.chunks.length,
+        confidenceSignals: signals,
       },
     };
 
@@ -182,7 +237,8 @@ export async function POST(request: NextRequest) {
 async function generateAnswer(
   question: string,
   chunks: RetrievedChunk[],
-  providerName: LLMProviderName
+  providerName: LLMProviderName,
+  mode: AnswerMode
 ): Promise<{ answer: string; citations: AnswerCitation[]; model: string }> {
   // Build source context for the LLM
   const sourcesText = chunks
@@ -202,30 +258,9 @@ ${chunk.content.slice(0, 1500)}${chunk.content.length > 1500 ? '...' : ''}
     })
     .join('\n---\n');
 
-  // Build the prompt
-  const systemPrompt = `You are a documentation assistant for a payment processing platform. Your role is to answer questions based ONLY on the provided sources.
-
-RULES:
-1. Answer in 3-8 sentences, being concise and actionable.
-2. Use ONLY information from the provided sources - do not make up information.
-3. Always cite your sources using numbered references like [1], [2], etc.
-4. If the sources don't contain enough information, say so clearly.
-5. Prefer information from [Docs] sources for navigation guidance.
-6. Use [KB] sources for troubleshooting and operational details.
-
-CITATION FORMAT:
-- Use [1], [2], etc. inline when referencing information
-- Each citation number corresponds to the source number in the provided context
-
-If you cannot answer the question from the sources, respond with:
-"I don't have enough information in the documentation to fully answer this question. [Suggest creating a support ticket if needed]"`;
-
-  const userPrompt = `SOURCES:
-${sourcesText}
-
-QUESTION: ${question}
-
-Please provide a concise answer with citations.`;
+  // Build the prompt based on mode
+  const systemPrompt = buildSystemPrompt(mode);
+  const userPrompt = buildUserPrompt(question, sourcesText, mode);
 
   const messages: LLMMessage[] = [
     { role: 'system', content: systemPrompt },
@@ -250,6 +285,57 @@ Please provide a concise answer with citations.`;
     citations,
     model,
   };
+}
+
+/**
+ * Build system prompt based on mode.
+ */
+function buildSystemPrompt(mode: AnswerMode): string {
+  const basePrompt = `You are a documentation assistant for a payment processing platform. Your role is to answer questions based ONLY on the provided sources.
+
+RULES:
+1. Use ONLY information from the provided sources - do not make up information.
+2. Always cite your sources using numbered references like [1], [2], etc.
+3. Each citation number corresponds to the source number in the provided context.
+4. If the sources don't contain enough information, say so clearly.
+5. Prefer information from [Docs] sources for navigation guidance.
+6. Use [KB] sources for troubleshooting and operational details.`;
+
+  if (mode === 'ticket_draft') {
+    return `${basePrompt}
+
+IMPORTANT: The user's question cannot be fully answered from the sources. Be brief and honest about the limitation. Suggest that a support ticket may be needed for more specific help.`;
+  }
+
+  return `${basePrompt}
+
+Answer in 3-8 sentences, being concise and actionable.`;
+}
+
+/**
+ * Build user prompt based on mode.
+ */
+function buildUserPrompt(question: string, sourcesText: string, mode: AnswerMode): string {
+  if (mode === 'ticket_draft') {
+    return `SOURCES:
+${sourcesText}
+
+QUESTION: ${question}
+
+The available sources may not fully answer this question. Provide a brief response that:
+1. Summarizes what relevant information exists in the sources (if any)
+2. Clearly indicates what cannot be answered
+3. Uses citations [1], [2] etc. where applicable
+
+Keep your response under 4 sentences.`;
+  }
+
+  return `SOURCES:
+${sourcesText}
+
+QUESTION: ${question}
+
+Please provide a concise answer with citations.`;
 }
 
 /**
@@ -305,6 +391,35 @@ function extractCitationsFromAnswer(
 }
 
 /**
+ * Generate fallback citations from top chunks when parsing fails.
+ */
+function generateFallbackCitations(chunks: RetrievedChunk[]): AnswerCitation[] {
+  return chunks.slice(0, 3).map((chunk, i) => {
+    const index = i + 1;
+
+    if (chunk.corpus === 'docs') {
+      const route = chunk.route || '/';
+      const anchor = chunk.anchor;
+      const url = anchor ? `${route}#${anchor}` : route;
+
+      return {
+        index,
+        corpus: 'docs' as const,
+        route,
+        anchor,
+        url,
+      };
+    }
+
+    return {
+      index,
+      corpus: 'kb' as const,
+      sourcePath: chunk.sourcePath,
+    };
+  });
+}
+
+/**
  * Get the model name from the provider response.
  */
 function getModelName(providerName: LLMProviderName, raw: unknown): string {
@@ -348,6 +463,17 @@ function validateCorpusScope(scope?: Array<'docs' | 'kb'>): Corpus[] | null {
   }
 
   return valid.length > 0 ? valid : null;
+}
+
+/**
+ * Validate confidence level parameter.
+ */
+function validateConfidenceLevel(level?: string): ConfidenceLevel | undefined {
+  if (!level) return undefined;
+  if (level === 'high' || level === 'medium' || level === 'low') {
+    return level;
+  }
+  return undefined;
 }
 
 /**

@@ -4,7 +4,7 @@
  * Pilot Answer Page
  *
  * LLM-powered answer UI for testing POST /api/answer endpoint.
- * Displays synthesized answers with citations and suggested routes.
+ * Displays synthesized answers with citations, confidence, and ticket drafts.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -21,6 +21,10 @@ const LS_PROVIDER = 'verbatim_pilot_answer_provider';
 type Provider = 'gemini' | 'openai' | 'anthropic';
 const PROVIDERS: Provider[] = ['gemini', 'openai', 'anthropic'];
 
+/** Confidence levels */
+type ConfidenceLevel = 'high' | 'medium' | 'low';
+const CONFIDENCE_LEVELS: ConfidenceLevel[] = ['high', 'medium', 'low'];
+
 /** Citation type */
 interface AnswerCitation {
   index: number;
@@ -29,6 +33,16 @@ interface AnswerCitation {
   anchor?: string | null;
   url?: string;
   sourcePath?: string;
+}
+
+/** Ticket draft type */
+interface TicketDraft {
+  title: string;
+  summary: string[];
+  userQuestion: string;
+  attemptedAnswer?: string;
+  suggestedNextInfo: string[];
+  citations: AnswerCitation[];
 }
 
 /** Response type from /api/answer */
@@ -41,6 +55,9 @@ interface AnswerResponse {
     route: string;
     title: string | null;
   }>;
+  confidence: ConfidenceLevel;
+  mode: 'answer' | 'ticket_draft';
+  ticketDraft?: TicketDraft;
   debug: {
     provider: string;
     model: string;
@@ -48,6 +65,17 @@ interface AnswerResponse {
     topK: number;
     corpusScope: string[];
     chunksUsed: number;
+    confidenceSignals: {
+      topScore: number;
+      secondScore: number;
+      scoreGap: number;
+      docsCount: number;
+      kbCount: number;
+      hasDocsTop1: boolean;
+      resultCount: number;
+      suggestedRoutesCount: number;
+      avgTop3Score: number;
+    };
   };
 }
 
@@ -62,11 +90,14 @@ export default function PilotAnswerPage() {
   });
   const [topK, setTopK] = useState(6);
   const [provider, setProvider] = useState<Provider>('gemini');
+  const [forceTicketDraft, setForceTicketDraft] = useState(false);
+  const [minConfidence, setMinConfidence] = useState<ConfidenceLevel | ''>('');
 
   // Request state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<AnswerResponse | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Load persisted values
   useEffect(() => {
@@ -97,47 +128,20 @@ export default function PilotAnswerPage() {
     }
   }, []);
 
-  // Persist workspace ID
+  // Persist settings
   useEffect(() => {
     try {
-      if (workspaceId) {
-        localStorage.setItem(LS_WORKSPACE_ID, workspaceId);
-      }
-    } catch {
-      // Ignore
-    }
-  }, [workspaceId]);
-
-  // Persist topK
-  useEffect(() => {
-    try {
+      if (workspaceId) localStorage.setItem(LS_WORKSPACE_ID, workspaceId);
       localStorage.setItem(LS_TOP_K, String(topK));
-    } catch {
-      // Ignore
-    }
-  }, [topK]);
-
-  // Persist corpus scope
-  useEffect(() => {
-    try {
       localStorage.setItem(LS_CORPUS_SCOPE, JSON.stringify(corpusScope));
-    } catch {
-      // Ignore
-    }
-  }, [corpusScope]);
-
-  // Persist provider
-  useEffect(() => {
-    try {
       localStorage.setItem(LS_PROVIDER, provider);
     } catch {
       // Ignore
     }
-  }, [provider]);
+  }, [workspaceId, topK, corpusScope, provider]);
 
   // Handle form submission
   const handleSubmit = useCallback(async () => {
-    // Validate inputs
     if (!workspaceId.trim()) {
       setError('Workspace ID is required');
       return;
@@ -159,18 +163,29 @@ export default function PilotAnswerPage() {
     setLoading(true);
     setError(null);
     setResponse(null);
+    setCopied(false);
 
     try {
+      const requestBody: Record<string, unknown> = {
+        workspaceId: workspaceId.trim(),
+        question: question.trim(),
+        topK,
+        corpusScope: scope,
+        provider,
+      };
+
+      if (forceTicketDraft) {
+        requestBody.forceTicketDraft = true;
+      }
+
+      if (minConfidence) {
+        requestBody.minConfidence = minConfidence;
+      }
+
       const res = await fetch('/api/answer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workspaceId: workspaceId.trim(),
-          question: question.trim(),
-          topK,
-          corpusScope: scope,
-          provider,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await res.json();
@@ -185,7 +200,7 @@ export default function PilotAnswerPage() {
     } finally {
       setLoading(false);
     }
-  }, [workspaceId, question, topK, corpusScope, provider]);
+  }, [workspaceId, question, topK, corpusScope, provider, forceTicketDraft, minConfidence]);
 
   // Handle Enter key in textarea
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -195,13 +210,55 @@ export default function PilotAnswerPage() {
     }
   };
 
+  // Copy ticket draft to clipboard
+  const handleCopyTicketDraft = useCallback(() => {
+    if (!response?.ticketDraft) return;
+
+    const draft = response.ticketDraft;
+    const lines: string[] = [];
+
+    lines.push(`Title: ${draft.title}`);
+    lines.push('');
+    lines.push('Summary:');
+    draft.summary.forEach((point) => lines.push(`  - ${point}`));
+    lines.push('');
+    lines.push(`Original Question: ${draft.userQuestion}`);
+
+    if (draft.attemptedAnswer) {
+      lines.push('');
+      lines.push('Attempted Answer:');
+      lines.push(draft.attemptedAnswer);
+    }
+
+    lines.push('');
+    lines.push('Suggested Next Steps:');
+    draft.suggestedNextInfo.forEach((point) => lines.push(`  - ${point}`));
+
+    if (draft.citations.length > 0) {
+      lines.push('');
+      lines.push('Related Documentation:');
+      draft.citations.forEach((citation) => {
+        if (citation.corpus === 'docs') {
+          lines.push(`  [${citation.index}] ${citation.url}`);
+        } else {
+          lines.push(`  [${citation.index}] KB: ${citation.sourcePath}`);
+        }
+      });
+    }
+
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [response]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Answer</h1>
         <p className="mt-1 text-gray-600">
-          Get LLM-synthesized answers with citations from the retrieval API.
+          Get LLM-synthesized answers with citations, confidence scoring, and ticket drafts.
         </p>
       </div>
 
@@ -224,12 +281,6 @@ export default function PilotAnswerPage() {
             <div className="mb-2 flex items-center gap-2 text-sm">
               <span className="text-gray-600">Active:</span>
               <span className="font-medium text-gray-900">{workspaceName}</span>
-              <Link
-                href="/pilot/workspaces"
-                className="text-xs text-blue-600 hover:text-blue-800"
-              >
-                Change
-              </Link>
             </div>
           )}
           <input
@@ -258,7 +309,7 @@ export default function PilotAnswerPage() {
           />
         </div>
 
-        {/* Options row */}
+        {/* Options row 1 */}
         <div className="flex flex-wrap gap-6">
           {/* Provider */}
           <div>
@@ -315,7 +366,7 @@ export default function PilotAnswerPage() {
           {/* Top K */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Top K Sources
+              Top K
             </label>
             <input
               type="number"
@@ -326,6 +377,43 @@ export default function PilotAnswerPage() {
               className="w-20 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               disabled={loading}
             />
+          </div>
+        </div>
+
+        {/* Options row 2 - Ticket draft controls */}
+        <div className="flex flex-wrap gap-6 pt-2 border-t border-gray-100">
+          {/* Force ticket draft */}
+          <div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={forceTicketDraft}
+                onChange={(e) => setForceTicketDraft(e.target.checked)}
+                disabled={loading}
+                className="text-blue-600 focus:ring-blue-500 rounded"
+              />
+              <span className="text-sm text-gray-700">Force ticket draft</span>
+            </label>
+          </div>
+
+          {/* Min confidence */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Min Confidence
+            </label>
+            <select
+              value={minConfidence}
+              onChange={(e) => setMinConfidence(e.target.value as ConfidenceLevel | '')}
+              disabled={loading}
+              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">None</option>
+              {CONFIDENCE_LEVELS.map((level) => (
+                <option key={level} value={level}>
+                  {level.charAt(0).toUpperCase() + level.slice(1)}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -351,6 +439,12 @@ export default function PilotAnswerPage() {
       {/* Response display */}
       {response && (
         <div className="space-y-6">
+          {/* Mode and Confidence badges */}
+          <div className="flex items-center gap-3">
+            <ModeBadge mode={response.mode} />
+            <ConfidenceBadge confidence={response.confidence} />
+          </div>
+
           {/* Answer */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-3">Answer</h2>
@@ -358,6 +452,72 @@ export default function PilotAnswerPage() {
               {response.answer}
             </div>
           </div>
+
+          {/* Ticket Draft */}
+          {response.ticketDraft && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-amber-900">Ticket Draft</h2>
+                <button
+                  onClick={handleCopyTicketDraft}
+                  className="px-3 py-1.5 text-sm bg-amber-100 text-amber-800 rounded hover:bg-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  {copied ? 'Copied!' : 'Copy to Clipboard'}
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Title */}
+                <div>
+                  <h3 className="text-sm font-medium text-amber-800 mb-1">Title</h3>
+                  <p className="text-sm text-gray-800 bg-white rounded px-3 py-2 border border-amber-200">
+                    {response.ticketDraft.title}
+                  </p>
+                </div>
+
+                {/* Summary */}
+                <div>
+                  <h3 className="text-sm font-medium text-amber-800 mb-1">Summary</h3>
+                  <ul className="text-sm text-gray-800 bg-white rounded px-3 py-2 border border-amber-200 space-y-1">
+                    {response.ticketDraft.summary.map((point, i) => (
+                      <li key={i}>• {point}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Suggested Next Info */}
+                <div>
+                  <h3 className="text-sm font-medium text-amber-800 mb-1">Suggested Next Steps</h3>
+                  <ul className="text-sm text-gray-800 bg-white rounded px-3 py-2 border border-amber-200 space-y-1">
+                    {response.ticketDraft.suggestedNextInfo.map((point, i) => (
+                      <li key={i}>• {point}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Draft Citations */}
+                {response.ticketDraft.citations.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-amber-800 mb-1">Related Documentation</h3>
+                    <ul className="text-sm bg-white rounded px-3 py-2 border border-amber-200 space-y-1">
+                      {response.ticketDraft.citations.map((citation) => (
+                        <li key={citation.index} className="flex items-center gap-2">
+                          <span className="text-gray-500">[{citation.index}]</span>
+                          {citation.corpus === 'docs' && citation.url ? (
+                            <Link href={citation.url} className="text-blue-600 hover:underline">
+                              {citation.url}
+                            </Link>
+                          ) : (
+                            <span className="text-gray-700">{citation.sourcePath}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Citations */}
           {response.citations.length > 0 && (
@@ -420,7 +580,8 @@ export default function PilotAnswerPage() {
             <summary className="px-4 py-3 cursor-pointer text-sm font-medium text-gray-700 hover:bg-gray-50">
               Debug Information
             </summary>
-            <div className="px-4 pb-4">
+            <div className="px-4 pb-4 space-y-4">
+              {/* Basic debug */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                 <div>
                   <span className="text-gray-500">Provider:</span>{' '}
@@ -447,6 +608,45 @@ export default function PilotAnswerPage() {
                   <span className="font-medium">{response.debug.corpusScope.join(', ')}</span>
                 </div>
               </div>
+
+              {/* Confidence signals */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Confidence Signals</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm bg-gray-50 rounded-lg p-3">
+                  <div>
+                    <span className="text-gray-500">Top Score:</span>{' '}
+                    <span className="font-mono">{response.debug.confidenceSignals.topScore.toFixed(2)}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">2nd Score:</span>{' '}
+                    <span className="font-mono">{response.debug.confidenceSignals.secondScore.toFixed(2)}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Score Gap:</span>{' '}
+                    <span className="font-mono">{response.debug.confidenceSignals.scoreGap.toFixed(2)}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Docs Count:</span>{' '}
+                    <span className="font-mono">{response.debug.confidenceSignals.docsCount}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">KB Count:</span>{' '}
+                    <span className="font-mono">{response.debug.confidenceSignals.kbCount}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Docs Top1:</span>{' '}
+                    <span className="font-mono">{response.debug.confidenceSignals.hasDocsTop1 ? 'Yes' : 'No'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Avg Top3:</span>{' '}
+                    <span className="font-mono">{response.debug.confidenceSignals.avgTop3Score.toFixed(2)}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Result Count:</span>{' '}
+                    <span className="font-mono">{response.debug.confidenceSignals.resultCount}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </details>
 
@@ -462,6 +662,40 @@ export default function PilotAnswerPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Mode badge component */
+function ModeBadge({ mode }: { mode: 'answer' | 'ticket_draft' }) {
+  const styles = {
+    answer: 'bg-green-100 text-green-800',
+    ticket_draft: 'bg-amber-100 text-amber-800',
+  };
+
+  const labels = {
+    answer: 'Answer Mode',
+    ticket_draft: 'Ticket Draft Mode',
+  };
+
+  return (
+    <span className={`px-3 py-1 rounded-full text-sm font-medium ${styles[mode]}`}>
+      {labels[mode]}
+    </span>
+  );
+}
+
+/** Confidence badge component */
+function ConfidenceBadge({ confidence }: { confidence: ConfidenceLevel }) {
+  const styles = {
+    high: 'bg-green-100 text-green-800 border-green-300',
+    medium: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+    low: 'bg-red-100 text-red-800 border-red-300',
+  };
+
+  return (
+    <span className={`px-3 py-1 rounded-full text-sm font-medium border ${styles[confidence]}`}>
+      Confidence: {confidence.charAt(0).toUpperCase() + confidence.slice(1)}
+    </span>
   );
 }
 

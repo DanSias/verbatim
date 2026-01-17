@@ -22,11 +22,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import type { Corpus } from '@prisma/client';
-import { db } from '@/lib/db';
 import {
-  keywordSearch,
-  toSearchResult,
-  extractSuggestedRoutes,
+  retrieve,
+  RetrievalError,
   type SearchResult,
   type SuggestedRoute,
 } from '@/lib/retrieval';
@@ -65,10 +63,8 @@ interface ApiError {
   details?: Record<string, unknown>;
 }
 
-/** Default values */
-const DEFAULT_TOP_K = 8;
+/** Default corpus scope */
 const DEFAULT_CORPUS_SCOPE: Corpus[] = ['docs', 'kb'];
-const MAX_SUGGESTED_ROUTES = 5;
 
 export async function POST(request: NextRequest) {
   try {
@@ -85,60 +81,35 @@ export async function POST(request: NextRequest) {
     const workspaceId = body.workspaceId;
     const question = body.question.trim();
     const conversationId = body.conversationId ?? crypto.randomUUID();
-    const topK = body.topK ?? DEFAULT_TOP_K;
+    const topK = body.topK;
     const corpusScope = validateCorpusScope(body.corpusScope) ?? DEFAULT_CORPUS_SCOPE;
 
-    // Verify workspace exists
-    const workspace = await db.workspace.findUnique({
-      where: { id: workspaceId },
-    });
-
-    if (!workspace) {
-      return errorResponse(`Workspace not found: ${workspaceId}`, 'NOT_FOUND', 404);
-    }
-
-    // Perform keyword-based retrieval
-    // (Vector retrieval can replace this when embeddings are implemented)
-    const retrievedChunks = await keywordSearch({
+    // Use shared retrieval function
+    const retrieval = await retrieve({
       workspaceId,
       question,
       topK,
       corpusScope,
     });
 
-    // Convert to search results with citations
-    const results: SearchResult[] = retrievedChunks.map(toSearchResult);
-
-    // Extract suggested routes from docs results only
-    const suggestedRoutes = extractSuggestedRoutes(retrievedChunks, MAX_SUGGESTED_ROUTES);
-
-    // Count total chunks for debug info
-    const totalChunks = await db.chunk.count({
-      where: {
-        document: {
-          workspaceId,
-          corpus: { in: corpusScope },
-        },
-      },
-    });
-
     const response: AskResponse = {
       question,
       workspaceId,
       conversationId,
-      results,
-      suggestedRoutes,
-      debug: {
-        retrievalMode: 'keyword', // Will change to 'vector' when embeddings are implemented
-        totalChunksScanned: totalChunks,
-        topK,
-        corpusScope: corpusScope as string[],
-      },
+      results: retrieval.results,
+      suggestedRoutes: retrieval.suggestedRoutes,
+      debug: retrieval.debug,
     };
 
     return NextResponse.json(response);
   } catch (error) {
     console.error('Ask endpoint error:', error);
+
+    if (error instanceof RetrievalError) {
+      const status = error.code === 'NOT_FOUND' ? 404 : 500;
+      return errorResponse(error.message, error.code, status);
+    }
+
     return errorResponse(
       'Internal server error',
       'INTERNAL_ERROR',

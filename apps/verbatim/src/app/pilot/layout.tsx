@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { href: '/pilot/ingest', label: 'Ingest' },
   { href: '/pilot/sources', label: 'Sources' },
   { href: '/pilot/ask', label: 'Ask' },
+  { href: '/pilot/answer', label: 'Answer' },
 ];
 
 export default function PilotLayout({

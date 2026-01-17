@@ -7,3 +7,4 @@
 
 export * from './keyword-search';
 export * from './citations';
+export * from './retrieve';

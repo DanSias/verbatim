@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { href: '/pilot/ask', label: 'Ask' },
   { href: '/pilot/answer', label: 'Answer' },
   { href: '/pilot/widget', label: 'Widget Demo' },
+  { href: '/pilot/widget/install', label: 'Widget Install' },
   { href: '/pilot/usage', label: 'Usage' },
 ];
 

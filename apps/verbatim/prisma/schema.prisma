@@ -153,3 +153,63 @@ model Message {
   @@index([conversationId])
   @@map("messages")
 }
+
+// ============================================================================
+// Phase 8.3: Query Event Logging
+// Persists query/answer events for analytics and debugging
+// ============================================================================
+
+model QueryEvent {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  // Context
+  workspaceId String
+  source      String // "answer" | "widget"
+  endpoint    String // "/api/answer" | "/api/widget/answer"
+
+  // LLM details
+  provider String
+  model    String
+
+  // Answer details
+  mode       String // "answer" | "ticket_draft"
+  confidence String // "high" | "medium" | "low"
+
+  // Request parameters
+  corpusScope String // comma-separated: "docs,kb"
+  topK        Int
+
+  // Question (PII-aware)
+  questionPreview String  @default("")
+  questionHash    String  @default("")
+  questionText    String? // only written when LOG_QUESTION_TEXT=1
+  questionLength  Int
+
+  // Latency metrics
+  latencyMs          Int
+  retrievalLatencyMs Int?
+  llmLatencyMs       Int?
+
+  // Retrieval/answer stats
+  chunksUsed    Int?
+  citationsJson Json? // array of { route?, sourcePath?, anchor?, index }
+  suggestedRoutesJson Json? // array of { route, title }
+
+  // Token usage (if available from provider)
+  inputTokens  Int?
+  outputTokens Int?
+  totalTokens  Int?
+
+  // Cost tracking
+  estimatedCostUsd Float?
+
+  // Error tracking (if request failed)
+  errorCode    String?
+  errorMessage String?
+
+  @@index([createdAt])
+  @@index([workspaceId])
+  @@index([provider, model])
+  @@map("query_events")
+}

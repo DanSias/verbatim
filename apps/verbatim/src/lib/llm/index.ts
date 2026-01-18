@@ -58,6 +58,14 @@ export {
   type LLMCaps,
 } from './config';
 
+// Re-export usage extraction utilities
+export {
+  extractUsage,
+  extractUsageFromRaw,
+  extractUsageFromUpstreamResponse,
+  type ExtractedUsage,
+} from './usage';
+
 /** Default provider when not specified */
 const DEFAULT_PROVIDER: LLMProviderName = 'gemini';
 

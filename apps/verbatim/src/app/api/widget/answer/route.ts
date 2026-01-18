@@ -31,6 +31,8 @@ import {
   jsonError,
   type ErrorCode,
 } from '@/lib/http';
+import { logQueryEventAsync } from '@/lib/logging';
+import { extractUsageFromUpstreamResponse, type LLMProviderName } from '@/lib/llm';
 
 export const runtime = 'nodejs';
 
@@ -162,6 +164,8 @@ async function safeParseJsonResponse(
 }
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+
   try {
     // Get server-side config
     const config = getWidgetConfig();
@@ -179,7 +183,8 @@ export async function POST(request: NextRequest) {
     if (upstreamResult.error) {
       return internalError(upstreamResult.error);
     }
-    const upstreamUrl = upstreamResult.url;
+    // TypeScript narrowing - url is guaranteed to exist after error check
+    const upstreamUrl = upstreamResult.url!;
 
     // Parse client request
     let body: WidgetRequest;
@@ -307,6 +312,45 @@ export async function POST(request: NextRequest) {
           snippet: parseResult.snippet,
         }
       );
+    }
+
+    // Log query event for remote mode only (local mode logs in /api/answer)
+    if (config.upstreamMode === 'remote' && upstreamResponse.ok) {
+      const latencyMs = Date.now() - startTime;
+      const responseData = parseResult.data as Record<string, unknown>;
+
+      // Extract data from upstream response
+      const confidence = (responseData.confidence as string) || 'low';
+      const mode = (responseData.mode as string) || 'answer';
+      const debug = responseData.debug as Record<string, unknown> | undefined;
+      const providerRaw = (debug?.provider as string) || 'gemini';
+      // Validate provider is a known type, default to gemini
+      const provider: LLMProviderName = ['gemini', 'openai', 'anthropic'].includes(providerRaw)
+        ? (providerRaw as LLMProviderName)
+        : 'gemini';
+      const model = (debug?.model as string) || 'unknown';
+      const chunksUsed = (debug?.chunksUsed as number) || undefined;
+
+      // Extract usage from upstream response
+      const usage = extractUsageFromUpstreamResponse(responseData);
+
+      logQueryEventAsync({
+        workspaceId,
+        source: 'widget',
+        endpoint: '/api/widget/answer',
+        provider,
+        model,
+        mode: mode as 'answer' | 'ticket_draft',
+        confidence: confidence as 'high' | 'medium' | 'low',
+        corpusScope: upstreamBody.corpusScope ?? ['docs', 'kb'],
+        topK: upstreamBody.topK ?? 6,
+        question,
+        latencyMs,
+        chunksUsed,
+        inputTokens: usage?.inputTokens,
+        outputTokens: usage?.outputTokens,
+        totalTokens: usage?.totalTokens,
+      });
     }
 
     // Forward the JSON response (including error responses)

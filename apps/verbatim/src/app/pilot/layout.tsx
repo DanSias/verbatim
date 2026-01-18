@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { href: '/pilot/ask', label: 'Ask' },
   { href: '/pilot/answer', label: 'Answer' },
   { href: '/pilot/widget', label: 'Widget Demo' },
+  { href: '/pilot/usage', label: 'Usage' },
 ];
 
 export default function PilotLayout({

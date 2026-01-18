@@ -41,9 +41,12 @@ import {
   limitChunks,
   truncateExcerpt,
   LLMTimeoutError,
+  extractUsage,
   type LLMProviderName,
   type LLMMessage,
+  type ExtractedUsage,
 } from '@/lib/llm';
+import { logQueryEventAsync } from '@/lib/logging';
 import {
   computeConfidence,
   meetsConfidenceThreshold,
@@ -96,6 +99,9 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
   let workspaceId: string | undefined;
   let providerName: LLMProviderName = getDefaultProvider();
+  let question: string | undefined;
+  let topK: number | undefined;
+  let corpusScope: Array<'docs' | 'kb'> | undefined;
 
   try {
     // Parse and validate request body
@@ -111,15 +117,18 @@ export async function POST(request: NextRequest) {
 
     const {
       workspaceId: wsId,
-      question,
-      topK,
-      corpusScope,
+      question: q,
+      topK: tk,
+      corpusScope: cs,
       provider,
       forceTicketDraft,
       minConfidence,
     } = parseResult.data;
 
     workspaceId = wsId;
+    question = q;
+    topK = tk;
+    corpusScope = cs;
     if (provider) {
       providerName = provider;
     }
@@ -207,16 +216,36 @@ export async function POST(request: NextRequest) {
         },
       };
 
+      const noSourcesLatencyMs = Date.now() - startTime;
       logRequestEnd('answer', {
         requestId,
         workspaceId,
-        latencyMs: Date.now() - startTime,
+        latencyMs: noSourcesLatencyMs,
         retrievalLatencyMs,
         provider: providerName,
         model: 'n/a',
         mode: 'ticket_draft',
         confidence: 'low',
         chunksUsed: 0,
+      });
+
+      // Log query event for no-sources case
+      logQueryEventAsync({
+        workspaceId,
+        source: 'answer',
+        endpoint: '/api/answer',
+        provider: providerName,
+        model: 'n/a',
+        mode: 'ticket_draft',
+        confidence: 'low',
+        corpusScope: corpusScope as string[],
+        topK,
+        question,
+        latencyMs: noSourcesLatencyMs,
+        retrievalLatencyMs,
+        chunksUsed: 0,
+        citations: [],
+        suggestedRoutes: [],
       });
 
       return NextResponse.json(response);
@@ -228,6 +257,7 @@ export async function POST(request: NextRequest) {
     let citations: AnswerCitation[];
     let model: string;
     let didTimeout = false;
+    let usage: ExtractedUsage | null = null;
 
     try {
       const llmResult = await generateAnswerWithTimeout(
@@ -239,6 +269,7 @@ export async function POST(request: NextRequest) {
       answer = llmResult.answer;
       citations = llmResult.citations;
       model = llmResult.model;
+      usage = llmResult.usage;
     } catch (error) {
       if (error instanceof LLMTimeoutError) {
         didTimeout = true;
@@ -291,10 +322,11 @@ export async function POST(request: NextRequest) {
     };
 
     // Log request end
+    const totalLatencyMs = Date.now() - startTime;
     logRequestEnd('answer', {
       requestId,
       workspaceId,
-      latencyMs: Date.now() - startTime,
+      latencyMs: totalLatencyMs,
       retrievalLatencyMs,
       llmLatencyMs,
       provider: providerName,
@@ -306,18 +338,62 @@ export async function POST(request: NextRequest) {
       timeout: didTimeout,
     });
 
+    // Log query event to database (async, non-blocking)
+    logQueryEventAsync({
+      workspaceId,
+      source: 'answer',
+      endpoint: '/api/answer',
+      provider: providerName,
+      model,
+      mode,
+      confidence,
+      corpusScope: corpusScope as string[],
+      topK,
+      question,
+      latencyMs: totalLatencyMs,
+      retrievalLatencyMs,
+      llmLatencyMs,
+      chunksUsed: retrieval.chunks.length,
+      citations: finalCitations,
+      suggestedRoutes: retrieval.suggestedRoutes,
+      inputTokens: usage?.inputTokens,
+      outputTokens: usage?.outputTokens,
+      totalTokens: usage?.totalTokens,
+    });
+
     return NextResponse.json(response);
   } catch (error) {
     const latencyMs = Date.now() - startTime;
+    const errorCode = error instanceof RetrievalError ? error.code : 'INTERNAL_ERROR';
+    const errorMessage = error instanceof Error ? error.message : String(error);
 
     // Log error
     logRequestEnd('answer', {
       requestId,
       workspaceId: workspaceId || 'unknown',
       latencyMs,
-      error: error instanceof Error ? error.message : String(error),
-      errorCode: error instanceof RetrievalError ? error.code : 'INTERNAL_ERROR',
+      error: errorMessage,
+      errorCode,
     });
+
+    // Log error event to database (only if we have enough context)
+    if (workspaceId && question) {
+      logQueryEventAsync({
+        workspaceId,
+        source: 'answer',
+        endpoint: '/api/answer',
+        provider: providerName,
+        model: 'error',
+        mode: 'answer',
+        confidence: 'low',
+        corpusScope: corpusScope ?? ['docs', 'kb'],
+        topK: topK ?? 6,
+        question,
+        latencyMs,
+        errorCode,
+        errorMessage,
+      });
+    }
 
     if (error instanceof LLMTimeoutError) {
       return llmTimeoutError(getLLMTimeout(), {
@@ -340,9 +416,17 @@ export async function POST(request: NextRequest) {
 
     return internalError('Internal server error', {
       requestId,
-      message: error instanceof Error ? error.message : String(error),
+      message: errorMessage,
     });
   }
+}
+
+/** Result from answer generation including usage */
+interface GenerateAnswerResult {
+  answer: string;
+  citations: AnswerCitation[];
+  model: string;
+  usage: ExtractedUsage | null;
 }
 
 /**
@@ -353,7 +437,7 @@ async function generateAnswerWithTimeout(
   chunks: RetrievedChunk[],
   providerName: LLMProviderName,
   mode: AnswerMode
-): Promise<{ answer: string; citations: AnswerCitation[]; model: string }> {
+): Promise<GenerateAnswerResult> {
   return withLLMTimeout(async (signal) => {
     return generateAnswer(question, chunks, providerName, mode, signal);
   });
@@ -368,7 +452,7 @@ async function generateAnswer(
   providerName: LLMProviderName,
   mode: AnswerMode,
   signal?: AbortSignal
-): Promise<{ answer: string; citations: AnswerCitation[]; model: string }> {
+): Promise<GenerateAnswerResult> {
   const caps = getLLMCaps();
 
   // Apply defensive caps: limit chunks and truncate excerpts
@@ -416,10 +500,14 @@ ${content}
   // Get model name from provider
   const model = getModelName(providerName, result.raw);
 
+  // Extract usage from result
+  const usage = extractUsage(result, providerName);
+
   return {
     answer: result.text,
     citations,
     model,
+    usage,
   };
 }
 

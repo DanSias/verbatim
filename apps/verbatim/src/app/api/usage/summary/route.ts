@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Calculate aggregates
-    let totalRequests = events.length;
+    const totalRequests = events.length;
     let totalLatencyMs = 0;
     let totalCostUsd = 0;
     let totalInputTokens = 0;

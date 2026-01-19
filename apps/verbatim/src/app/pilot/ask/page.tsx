@@ -180,34 +180,34 @@ export default function PilotAskPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Ask</h1>
-        <p className="mt-1 text-gray-600">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Ask</h1>
+        <p className="mt-1 text-gray-600 dark:text-gray-300">
           Query the retrieval API and view ranked results with citations.
         </p>
       </div>
 
       {/* Form */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 space-y-4">
         {/* Workspace ID */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Workspace ID
             </label>
             <Link
               href="/pilot/workspaces"
-              className="text-xs text-blue-600 hover:text-blue-800"
+              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
             >
               Manage workspaces
             </Link>
           </div>
           {workspaceName && workspaceId && (
             <div className="mb-2 flex items-center gap-2 text-sm">
-              <span className="text-gray-600">Active:</span>
-              <span className="font-medium text-gray-900">{workspaceName}</span>
+              <span className="text-gray-600 dark:text-gray-400">Active:</span>
+              <span className="font-medium text-gray-900 dark:text-gray-100">{workspaceName}</span>
               <Link
                 href="/pilot/workspaces"
-                className="text-xs text-blue-600 hover:text-blue-800"
+                className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
               >
                 Change
               </Link>
@@ -218,14 +218,14 @@ export default function PilotAskPage() {
             value={workspaceId}
             onChange={(e) => setWorkspaceId(e.target.value)}
             placeholder="e.g., clx123abc..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900"
             disabled={loading}
           />
         </div>
 
         {/* Question */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Question
           </label>
           <textarea
@@ -234,7 +234,7 @@ export default function PilotAskPage() {
             onKeyDown={handleKeyDown}
             placeholder="Enter your question... (Enter to submit, Shift+Enter for newline)"
             rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
+            className="w-full px-3 py-2 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900 resize-y"
             disabled={loading}
           />
         </div>
@@ -243,7 +243,7 @@ export default function PilotAskPage() {
         <div className="flex flex-wrap gap-6">
           {/* Corpus scope */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Corpus Scope
             </label>
             <div className="flex gap-4">
@@ -257,7 +257,7 @@ export default function PilotAskPage() {
                   disabled={loading}
                   className="text-blue-600 focus:ring-blue-500 rounded"
                 />
-                <span className="text-sm text-gray-700">docs</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300">docs</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -269,14 +269,14 @@ export default function PilotAskPage() {
                   disabled={loading}
                   className="text-blue-600 focus:ring-blue-500 rounded"
                 />
-                <span className="text-sm text-gray-700">kb</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300">kb</span>
               </label>
             </div>
           </div>
 
           {/* Top K */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Top K
             </label>
             <input
@@ -285,7 +285,7 @@ export default function PilotAskPage() {
               onChange={(e) => setTopK(parseInt(e.target.value, 10) || 8)}
               min={1}
               max={50}
-              className="w-20 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-20 px-3 py-1.5 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900"
               disabled={loading}
             />
           </div>
@@ -295,7 +295,7 @@ export default function PilotAskPage() {
         <button
           onClick={handleSubmit}
           disabled={loading}
-          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
         >
           {loading ? 'Loading...' : 'Ask'}
         </button>
@@ -303,8 +303,8 @@ export default function PilotAskPage() {
 
       {/* Error display */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-sm text-red-700">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 rounded-lg p-4">
+          <p className="text-sm text-red-700 dark:text-red-200">
             <strong>Error:</strong> {error}
           </p>
         </div>
@@ -314,9 +314,9 @@ export default function PilotAskPage() {
       {response && (
         <div className="space-y-6">
           {/* Summary */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <h2 className="text-sm font-medium text-green-800 mb-2">Summary</h2>
-            <div className="flex flex-wrap gap-4 text-sm text-green-700">
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900/40 rounded-lg p-4">
+            <h2 className="text-sm font-medium text-green-800 dark:text-green-200 mb-2">Summary</h2>
+            <div className="flex flex-wrap gap-4 text-sm text-green-700 dark:text-green-300">
               <span>
                 <strong>Results:</strong> {response.results.length}
               </span>
@@ -331,8 +331,8 @@ export default function PilotAskPage() {
 
           {/* Suggested routes */}
           {response.suggestedRoutes.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <h2 className="text-sm font-medium text-gray-900 mb-2">
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+              <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                 Suggested Routes
               </h2>
               <ul className="space-y-1">
@@ -340,12 +340,12 @@ export default function PilotAskPage() {
                   <li key={i} className="text-sm">
                     <Link
                       href={route.route}
-                      className="text-blue-600 hover:underline font-mono"
+                      className="text-blue-600 dark:text-blue-400 hover:underline font-mono"
                     >
                       {route.route}
                     </Link>
                     {route.title && (
-                      <span className="text-gray-500 ml-2">— {route.title}</span>
+                      <span className="text-gray-500 dark:text-gray-400 ml-2">— {route.title}</span>
                     )}
                   </li>
                 ))}
@@ -356,7 +356,7 @@ export default function PilotAskPage() {
           {/* Results list */}
           {response.results.length > 0 && (
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900">Results</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Results</h2>
               {response.results.map((result, i) => (
                 <ResultCard key={result.chunkId} result={result} rank={i + 1} />
               ))}
@@ -364,8 +364,8 @@ export default function PilotAskPage() {
           )}
 
           {/* Raw JSON */}
-          <details className="bg-white border border-gray-200 rounded-lg">
-            <summary className="px-4 py-3 cursor-pointer text-sm font-medium text-gray-700 hover:bg-gray-50">
+          <details className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg">
+            <summary className="px-4 py-3 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
               Raw JSON Response
             </summary>
             <pre className="p-4 bg-gray-900 text-gray-100 text-xs overflow-x-auto rounded-b-lg max-h-96">
@@ -387,24 +387,24 @@ function ResultCard({
   rank: number;
 }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4">
+    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
       {/* Header row */}
       <div className="flex items-center gap-3 mb-3">
-        <span className="text-lg font-bold text-gray-400">#{rank}</span>
+        <span className="text-lg font-bold text-gray-400 dark:text-gray-500">#{rank}</span>
         <CorpusBadge corpus={result.corpus} />
-        <span className="text-sm text-gray-500 ml-auto">
+        <span className="text-sm text-gray-500 dark:text-gray-400 ml-auto">
           score: {result.score}
         </span>
       </div>
 
       {/* Canonical ID */}
-      <div className="text-xs text-gray-500 font-mono mb-2">
+      <div className="text-xs text-gray-500 dark:text-gray-400 font-mono mb-2">
         {result.canonicalId}
       </div>
 
       {/* Heading path */}
       {result.headingPath.length > 0 && (
-        <div className="text-sm text-gray-600 italic mb-2">
+        <div className="text-sm text-gray-600 dark:text-gray-400 italic mb-2">
           {result.headingPath.join(' > ')}
         </div>
       )}
@@ -414,20 +414,20 @@ function ResultCard({
         {result.citation.url ? (
           <Link
             href={result.citation.url}
-            className="text-blue-600 hover:underline font-mono"
+            className="text-blue-600 dark:text-blue-400 hover:underline font-mono"
           >
             {result.citation.route}
             {result.citation.anchor && `#${result.citation.anchor}`}
           </Link>
         ) : (
-          <span className="text-gray-600 font-mono">
+          <span className="text-gray-600 dark:text-gray-400 font-mono">
             {result.citation.sourcePath}
           </span>
         )}
       </div>
 
       {/* Excerpt */}
-      <div className="bg-gray-50 border border-gray-200 rounded p-3 text-sm text-gray-700 leading-relaxed">
+      <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded p-3 text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
         {result.excerpt}
       </div>
     </div>
@@ -437,8 +437,8 @@ function ResultCard({
 /** Corpus badge component */
 function CorpusBadge({ corpus }: { corpus: 'docs' | 'kb' }) {
   const styles = {
-    docs: 'bg-blue-100 text-blue-800',
-    kb: 'bg-emerald-100 text-emerald-800',
+    docs: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300',
+    kb: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300',
   };
 
   return (

@@ -192,12 +192,12 @@ export default function PilotSourceDetailPage({
         <div>
           <Link
             href="/pilot/sources"
-            className="text-sm text-blue-600 hover:text-blue-800"
+            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
           >
             &larr; Back to Sources
           </Link>
         </div>
-        <div className="text-gray-500">Loading...</div>
+        <div className="text-gray-500 dark:text-gray-400">Loading...</div>
       </div>
     );
   }
@@ -208,13 +208,13 @@ export default function PilotSourceDetailPage({
         <div>
           <Link
             href="/pilot/sources"
-            className="text-sm text-blue-600 hover:text-blue-800"
+            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
           >
             &larr; Back to Sources
           </Link>
         </div>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-sm text-red-700">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 rounded-lg p-4">
+          <p className="text-sm text-red-700 dark:text-red-200">
             <strong>Error:</strong> {error}
           </p>
         </div>
@@ -228,12 +228,12 @@ export default function PilotSourceDetailPage({
         <div>
           <Link
             href="/pilot/sources"
-            className="text-sm text-blue-600 hover:text-blue-800"
+            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
           >
             &larr; Back to Sources
           </Link>
         </div>
-        <div className="text-gray-500">Document not found.</div>
+        <div className="text-gray-500 dark:text-gray-400">Document not found.</div>
       </div>
     );
   }
@@ -246,7 +246,7 @@ export default function PilotSourceDetailPage({
       <div>
         <Link
           href="/pilot/sources"
-          className="text-sm text-blue-600 hover:text-blue-800"
+          className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
         >
           &larr; Back to Sources
         </Link>
@@ -259,35 +259,35 @@ export default function PilotSourceDetailPage({
             <span
               className={`px-2 py-0.5 text-xs font-medium rounded ${
                 document.corpus === 'docs'
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-purple-100 text-purple-700'
+                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                  : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
               }`}
             >
               {document.corpus}
             </span>
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
               {document.workspace.name}
             </span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">{displayTitle}</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{displayTitle}</h1>
         </div>
 
         {/* Delete button / confirmation */}
         <div className="shrink-0">
           {deleteConfirm ? (
-            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg p-3">
-              <span className="text-sm text-red-700">Delete this source?</span>
+            <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 rounded-lg p-3">
+              <span className="text-sm text-red-700 dark:text-red-300">Delete this source?</span>
               <button
                 onClick={handleDelete}
                 disabled={deleting || !canDelete}
-                className="px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
               >
                 {deleting ? 'Deleting...' : 'Yes, delete'}
               </button>
               <button
                 onClick={() => setDeleteConfirm(false)}
                 disabled={deleting}
-                className="px-3 py-1.5 bg-white text-gray-700 text-sm font-medium rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+                className="px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-medium rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -303,7 +303,7 @@ export default function PilotSourceDetailPage({
                     ? 'Document belongs to a different workspace'
                     : 'Delete this source'
               }
-              className="px-4 py-2 bg-red-100 text-red-700 text-sm font-medium rounded-lg hover:bg-red-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm font-medium rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-500 disabled:cursor-not-allowed"
             >
               Delete source
             </button>
@@ -313,8 +313,8 @@ export default function PilotSourceDetailPage({
 
       {/* Delete error */}
       {deleteError && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-sm text-red-700">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 rounded-lg p-4">
+          <p className="text-sm text-red-700 dark:text-red-200">
             <strong>Delete failed:</strong> {deleteError}
           </p>
         </div>
@@ -322,8 +322,8 @@ export default function PilotSourceDetailPage({
 
       {/* Workspace mismatch warning */}
       {document && workspaceId && document.workspace.id !== workspaceId && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <p className="text-sm text-yellow-700">
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/40 rounded-lg p-4">
+          <p className="text-sm text-yellow-700 dark:text-yellow-300">
             This document belongs to workspace <strong>{document.workspace.name}</strong>,
             but your active workspace is different. Switch to the correct workspace to delete.
           </p>
@@ -332,10 +332,10 @@ export default function PilotSourceDetailPage({
 
       {/* No workspace warning */}
       {!workspaceId && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <p className="text-sm text-yellow-700">
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/40 rounded-lg p-4">
+          <p className="text-sm text-yellow-700 dark:text-yellow-300">
             No active workspace selected.{' '}
-            <Link href="/pilot/workspaces" className="text-yellow-800 underline">
+            <Link href="/pilot/workspaces" className="text-yellow-800 dark:text-yellow-200 underline">
               Select a workspace
             </Link>{' '}
             to enable delete.
@@ -344,36 +344,36 @@ export default function PilotSourceDetailPage({
       )}
 
       {/* Document metadata */}
-      <section className="bg-white border border-gray-200 rounded-lg p-4">
-        <h2 className="text-sm font-medium text-gray-900 mb-3">Document Details</h2>
+      <section className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+        <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Document Details</h2>
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
           <div>
-            <dt className="text-gray-500">Canonical ID</dt>
-            <dd className="font-mono text-gray-900 break-all">{document.canonicalId}</dd>
+            <dt className="text-gray-500 dark:text-gray-400">Canonical ID</dt>
+            <dd className="font-mono text-gray-900 dark:text-gray-100 break-all">{document.canonicalId}</dd>
           </div>
           {document.route && (
             <div>
-              <dt className="text-gray-500">Route</dt>
-              <dd className="font-mono text-gray-900">{document.route}</dd>
+              <dt className="text-gray-500 dark:text-gray-400">Route</dt>
+              <dd className="font-mono text-gray-900 dark:text-gray-100">{document.route}</dd>
             </div>
           )}
           <div>
-            <dt className="text-gray-500">Source Path</dt>
-            <dd className="font-mono text-gray-900 break-all">{document.sourcePath}</dd>
+            <dt className="text-gray-500 dark:text-gray-400">Source Path</dt>
+            <dd className="font-mono text-gray-900 dark:text-gray-100 break-all">{document.sourcePath}</dd>
           </div>
           <div>
-            <dt className="text-gray-500">Content Hash</dt>
-            <dd className="font-mono text-gray-900 text-xs">{document.contentHash}</dd>
+            <dt className="text-gray-500 dark:text-gray-400">Content Hash</dt>
+            <dd className="font-mono text-gray-900 dark:text-gray-100 text-xs">{document.contentHash}</dd>
           </div>
           <div>
-            <dt className="text-gray-500">Created</dt>
-            <dd className="text-gray-900">
+            <dt className="text-gray-500 dark:text-gray-400">Created</dt>
+            <dd className="text-gray-900 dark:text-gray-100">
               {new Date(document.createdAt).toLocaleString()}
             </dd>
           </div>
           <div>
-            <dt className="text-gray-500">Updated</dt>
-            <dd className="text-gray-900">
+            <dt className="text-gray-500 dark:text-gray-400">Updated</dt>
+            <dd className="text-gray-900 dark:text-gray-100">
               {new Date(document.updatedAt).toLocaleString()}
             </dd>
           </div>
@@ -381,22 +381,22 @@ export default function PilotSourceDetailPage({
       </section>
 
       {/* Chunks */}
-      <section className="bg-white border border-gray-200 rounded-lg">
-        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-sm font-medium text-gray-900">
+      <section className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg">
+        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+          <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100">
             Chunks ({document.chunkCount})
           </h2>
           <div className="flex gap-2">
             <button
               onClick={expandAll}
-              className="text-xs text-blue-600 hover:text-blue-800"
+              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
             >
               Expand all
             </button>
-            <span className="text-gray-300">|</span>
+            <span className="text-gray-300 dark:text-gray-600">|</span>
             <button
               onClick={collapseAll}
-              className="text-xs text-blue-600 hover:text-blue-800"
+              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
             >
               Collapse all
             </button>
@@ -404,9 +404,9 @@ export default function PilotSourceDetailPage({
         </div>
 
         {document.chunks.length === 0 ? (
-          <div className="p-4 text-sm text-gray-500">No chunks found.</div>
+          <div className="p-4 text-sm text-gray-500 dark:text-gray-400">No chunks found.</div>
         ) : (
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {document.chunks.map((chunk) => (
               <ChunkRow
                 key={chunk.id}
@@ -457,29 +457,29 @@ function ChunkRow({
         onClick={onToggle}
         className="w-full flex items-start gap-3 text-left"
       >
-        <span className="text-gray-400 mt-0.5">
+        <span className="text-gray-400 dark:text-gray-500 mt-0.5">
           {expanded ? '\u25BC' : '\u25B6'}
         </span>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-medium text-gray-500">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
               #{chunk.chunkIndex}
             </span>
             {chunk.headingPath.length > 0 && (
-              <span className="text-sm text-gray-700 truncate">
+              <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
                 {chunk.headingPath.join(' > ')}
               </span>
             )}
             {chunk.anchor && (
-              <code className="text-xs bg-gray-100 px-1 rounded text-gray-600">
+              <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1 rounded text-gray-600 dark:text-gray-400">
                 #{chunk.anchor}
               </code>
             )}
           </div>
 
           {!expanded && (
-            <p className="mt-1 text-sm text-gray-500 truncate">{preview}</p>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 truncate">{preview}</p>
           )}
         </div>
       </button>
@@ -490,22 +490,22 @@ function ChunkRow({
           {/* Citation link */}
           {citationUrl && (
             <div className="text-xs">
-              <span className="text-gray-500">Citation URL: </span>
-              <code className="bg-blue-50 px-1.5 py-0.5 rounded text-blue-700">
+              <span className="text-gray-500 dark:text-gray-400">Citation URL: </span>
+              <code className="bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded text-blue-700 dark:text-blue-300">
                 {citationUrl}
               </code>
             </div>
           )}
 
           {/* Content */}
-          <div className="bg-gray-50 rounded-lg p-3">
-            <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono">
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+            <pre className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap font-mono">
               {chunk.content}
             </pre>
           </div>
 
           {/* Metadata */}
-          <div className="flex gap-4 text-xs text-gray-500">
+          <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400">
             <span>ID: {chunk.id}</span>
             <span>
               Created: {new Date(chunk.createdAt).toLocaleString()}

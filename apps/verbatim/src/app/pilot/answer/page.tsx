@@ -256,31 +256,31 @@ export default function PilotAnswerPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Answer</h1>
-        <p className="mt-1 text-gray-600">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Answer</h1>
+        <p className="mt-1 text-gray-600 dark:text-gray-300">
           Get LLM-synthesized answers with citations, confidence scoring, and ticket drafts.
         </p>
       </div>
 
       {/* Form */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 space-y-4">
         {/* Workspace ID */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Workspace ID
             </label>
             <Link
               href="/pilot/workspaces"
-              className="text-xs text-blue-600 hover:text-blue-800"
+              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
             >
               Manage workspaces
             </Link>
           </div>
           {workspaceName && workspaceId && (
             <div className="mb-2 flex items-center gap-2 text-sm">
-              <span className="text-gray-600">Active:</span>
-              <span className="font-medium text-gray-900">{workspaceName}</span>
+              <span className="text-gray-600 dark:text-gray-400">Active:</span>
+              <span className="font-medium text-gray-900 dark:text-gray-100">{workspaceName}</span>
             </div>
           )}
           <input
@@ -288,14 +288,14 @@ export default function PilotAnswerPage() {
             value={workspaceId}
             onChange={(e) => setWorkspaceId(e.target.value)}
             placeholder="e.g., clx123abc..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900"
             disabled={loading}
           />
         </div>
 
         {/* Question */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Question
           </label>
           <textarea
@@ -304,7 +304,7 @@ export default function PilotAnswerPage() {
             onKeyDown={handleKeyDown}
             placeholder="Enter your question... (Enter to submit, Shift+Enter for newline)"
             rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
+            className="w-full px-3 py-2 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900 resize-y"
             disabled={loading}
           />
         </div>
@@ -313,14 +313,14 @@ export default function PilotAnswerPage() {
         <div className="flex flex-wrap gap-6">
           {/* Provider */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               LLM Provider
             </label>
             <select
               value={provider}
               onChange={(e) => setProvider(e.target.value as Provider)}
               disabled={loading}
-              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="px-3 py-1.5 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900"
             >
               {PROVIDERS.map((p) => (
                 <option key={p} value={p}>
@@ -332,7 +332,7 @@ export default function PilotAnswerPage() {
 
           {/* Corpus scope */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Corpus Scope
             </label>
             <div className="flex gap-4">
@@ -346,7 +346,7 @@ export default function PilotAnswerPage() {
                   disabled={loading}
                   className="text-blue-600 focus:ring-blue-500 rounded"
                 />
-                <span className="text-sm text-gray-700">docs</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300">docs</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -358,14 +358,14 @@ export default function PilotAnswerPage() {
                   disabled={loading}
                   className="text-blue-600 focus:ring-blue-500 rounded"
                 />
-                <span className="text-sm text-gray-700">kb</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300">kb</span>
               </label>
             </div>
           </div>
 
           {/* Top K */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Top K
             </label>
             <input
@@ -374,14 +374,14 @@ export default function PilotAnswerPage() {
               onChange={(e) => setTopK(parseInt(e.target.value, 10) || 6)}
               min={1}
               max={20}
-              className="w-20 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-20 px-3 py-1.5 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900"
               disabled={loading}
             />
           </div>
         </div>
 
         {/* Options row 2 - Ticket draft controls */}
-        <div className="flex flex-wrap gap-6 pt-2 border-t border-gray-100">
+        <div className="flex flex-wrap gap-6 pt-2 border-t border-gray-100 dark:border-gray-800">
           {/* Force ticket draft */}
           <div>
             <label className="flex items-center gap-2 cursor-pointer">
@@ -392,20 +392,20 @@ export default function PilotAnswerPage() {
                 disabled={loading}
                 className="text-blue-600 focus:ring-blue-500 rounded"
               />
-              <span className="text-sm text-gray-700">Force ticket draft</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">Force ticket draft</span>
             </label>
           </div>
 
           {/* Min confidence */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Min Confidence
             </label>
             <select
               value={minConfidence}
               onChange={(e) => setMinConfidence(e.target.value as ConfidenceLevel | '')}
               disabled={loading}
-              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="px-3 py-1.5 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900"
             >
               <option value="">None</option>
               {CONFIDENCE_LEVELS.map((level) => (
@@ -421,7 +421,7 @@ export default function PilotAnswerPage() {
         <button
           onClick={handleSubmit}
           disabled={loading}
-          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
         >
           {loading ? 'Generating...' : 'Get Answer'}
         </button>
@@ -429,8 +429,8 @@ export default function PilotAnswerPage() {
 
       {/* Error display */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-sm text-red-700">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 rounded-lg p-4">
+          <p className="text-sm text-red-700 dark:text-red-200">
             <strong>Error:</strong> {error}
           </p>
         </div>
@@ -446,21 +446,21 @@ export default function PilotAnswerPage() {
           </div>
 
           {/* Answer */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Answer</h2>
-            <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Answer</h2>
+            <div className="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
               {response.answer}
             </div>
           </div>
 
           {/* Ticket Draft */}
           {response.ticketDraft && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/40 rounded-lg p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-amber-900">Ticket Draft</h2>
+                <h2 className="text-lg font-semibold text-amber-900 dark:text-amber-200">Ticket Draft</h2>
                 <button
                   onClick={handleCopyTicketDraft}
-                  className="px-3 py-1.5 text-sm bg-amber-100 text-amber-800 rounded hover:bg-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="px-3 py-1.5 text-sm bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 rounded hover:bg-amber-200 dark:hover:bg-amber-900/60 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 >
                   {copied ? 'Copied!' : 'Copy to Clipboard'}
                 </button>
@@ -469,16 +469,16 @@ export default function PilotAnswerPage() {
               <div className="space-y-4">
                 {/* Title */}
                 <div>
-                  <h3 className="text-sm font-medium text-amber-800 mb-1">Title</h3>
-                  <p className="text-sm text-gray-800 bg-white rounded px-3 py-2 border border-amber-200">
+                  <h3 className="text-sm font-medium text-amber-800 dark:text-amber-300 mb-1">Title</h3>
+                  <p className="text-sm text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-900 rounded px-3 py-2 border border-amber-200 dark:border-amber-900/40">
                     {response.ticketDraft.title}
                   </p>
                 </div>
 
                 {/* Summary */}
                 <div>
-                  <h3 className="text-sm font-medium text-amber-800 mb-1">Summary</h3>
-                  <ul className="text-sm text-gray-800 bg-white rounded px-3 py-2 border border-amber-200 space-y-1">
+                  <h3 className="text-sm font-medium text-amber-800 dark:text-amber-300 mb-1">Summary</h3>
+                  <ul className="text-sm text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-900 rounded px-3 py-2 border border-amber-200 dark:border-amber-900/40 space-y-1">
                     {response.ticketDraft.summary.map((point, i) => (
                       <li key={i}>• {point}</li>
                     ))}
@@ -487,8 +487,8 @@ export default function PilotAnswerPage() {
 
                 {/* Suggested Next Info */}
                 <div>
-                  <h3 className="text-sm font-medium text-amber-800 mb-1">Suggested Next Steps</h3>
-                  <ul className="text-sm text-gray-800 bg-white rounded px-3 py-2 border border-amber-200 space-y-1">
+                  <h3 className="text-sm font-medium text-amber-800 dark:text-amber-300 mb-1">Suggested Next Steps</h3>
+                  <ul className="text-sm text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-900 rounded px-3 py-2 border border-amber-200 dark:border-amber-900/40 space-y-1">
                     {response.ticketDraft.suggestedNextInfo.map((point, i) => (
                       <li key={i}>• {point}</li>
                     ))}
@@ -498,17 +498,17 @@ export default function PilotAnswerPage() {
                 {/* Draft Citations */}
                 {response.ticketDraft.citations.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-medium text-amber-800 mb-1">Related Documentation</h3>
-                    <ul className="text-sm bg-white rounded px-3 py-2 border border-amber-200 space-y-1">
+                    <h3 className="text-sm font-medium text-amber-800 dark:text-amber-300 mb-1">Related Documentation</h3>
+                    <ul className="text-sm bg-white dark:bg-gray-900 rounded px-3 py-2 border border-amber-200 dark:border-amber-900/40 space-y-1">
                       {response.ticketDraft.citations.map((citation) => (
                         <li key={citation.index} className="flex items-center gap-2">
-                          <span className="text-gray-500">[{citation.index}]</span>
+                          <span className="text-gray-500 dark:text-gray-400">[{citation.index}]</span>
                           {citation.corpus === 'docs' && citation.url ? (
-                            <Link href={citation.url} className="text-blue-600 hover:underline">
+                            <Link href={citation.url} className="text-blue-600 dark:text-blue-400 hover:underline">
                               {citation.url}
                             </Link>
                           ) : (
-                            <span className="text-gray-700">{citation.sourcePath}</span>
+                            <span className="text-gray-700 dark:text-gray-300">{citation.sourcePath}</span>
                           )}
                         </li>
                       ))}
@@ -521,27 +521,27 @@ export default function PilotAnswerPage() {
 
           {/* Citations */}
           {response.citations.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <h2 className="text-sm font-medium text-gray-900 mb-3">
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+              <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
                 Citations ({response.citations.length})
               </h2>
               <ul className="space-y-2">
                 {response.citations.map((citation) => (
                   <li key={citation.index} className="flex items-start gap-2 text-sm">
-                    <span className="font-mono text-gray-500 flex-shrink-0">
+                    <span className="font-mono text-gray-500 dark:text-gray-400 flex-shrink-0">
                       [{citation.index}]
                     </span>
                     <CorpusBadge corpus={citation.corpus} />
                     {citation.corpus === 'docs' && citation.url ? (
                       <Link
                         href={citation.url}
-                        className="text-blue-600 hover:underline font-mono"
+                        className="text-blue-600 dark:text-blue-400 hover:underline font-mono"
                       >
                         {citation.route}
                         {citation.anchor && `#${citation.anchor}`}
                       </Link>
                     ) : (
-                      <span className="text-gray-600 font-mono">
+                      <span className="text-gray-600 dark:text-gray-400 font-mono">
                         {citation.sourcePath}
                       </span>
                     )}
@@ -553,8 +553,8 @@ export default function PilotAnswerPage() {
 
           {/* Suggested routes */}
           {response.suggestedRoutes.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <h2 className="text-sm font-medium text-gray-900 mb-2">
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+              <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                 Suggested Routes
               </h2>
               <ul className="space-y-1">
@@ -562,12 +562,12 @@ export default function PilotAnswerPage() {
                   <li key={i} className="text-sm">
                     <Link
                       href={route.route}
-                      className="text-blue-600 hover:underline font-mono"
+                      className="text-blue-600 dark:text-blue-400 hover:underline font-mono"
                     >
                       {route.route}
                     </Link>
                     {route.title && (
-                      <span className="text-gray-500 ml-2">— {route.title}</span>
+                      <span className="text-gray-500 dark:text-gray-400 ml-2">— {route.title}</span>
                     )}
                   </li>
                 ))}
@@ -576,74 +576,74 @@ export default function PilotAnswerPage() {
           )}
 
           {/* Debug info */}
-          <details className="bg-white border border-gray-200 rounded-lg">
-            <summary className="px-4 py-3 cursor-pointer text-sm font-medium text-gray-700 hover:bg-gray-50">
+          <details className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg">
+            <summary className="px-4 py-3 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
               Debug Information
             </summary>
             <div className="px-4 pb-4 space-y-4">
               {/* Basic debug */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                 <div>
-                  <span className="text-gray-500">Provider:</span>{' '}
-                  <span className="font-medium">{response.debug.provider}</span>
+                  <span className="text-gray-500 dark:text-gray-400">Provider:</span>{' '}
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{response.debug.provider}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500">Model:</span>{' '}
-                  <span className="font-medium">{response.debug.model}</span>
+                  <span className="text-gray-500 dark:text-gray-400">Model:</span>{' '}
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{response.debug.model}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500">Retrieval:</span>{' '}
-                  <span className="font-medium">{response.debug.retrievalMode}</span>
+                  <span className="text-gray-500 dark:text-gray-400">Retrieval:</span>{' '}
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{response.debug.retrievalMode}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500">Top K:</span>{' '}
-                  <span className="font-medium">{response.debug.topK}</span>
+                  <span className="text-gray-500 dark:text-gray-400">Top K:</span>{' '}
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{response.debug.topK}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500">Chunks Used:</span>{' '}
-                  <span className="font-medium">{response.debug.chunksUsed}</span>
+                  <span className="text-gray-500 dark:text-gray-400">Chunks Used:</span>{' '}
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{response.debug.chunksUsed}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500">Corpus:</span>{' '}
-                  <span className="font-medium">{response.debug.corpusScope.join(', ')}</span>
+                  <span className="text-gray-500 dark:text-gray-400">Corpus:</span>{' '}
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{response.debug.corpusScope.join(', ')}</span>
                 </div>
               </div>
 
               {/* Confidence signals */}
               <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Confidence Signals</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm bg-gray-50 rounded-lg p-3">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Confidence Signals</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                   <div>
-                    <span className="text-gray-500">Top Score:</span>{' '}
-                    <span className="font-mono">{response.debug.confidenceSignals.topScore.toFixed(2)}</span>
+                    <span className="text-gray-500 dark:text-gray-400">Top Score:</span>{' '}
+                    <span className="font-mono text-gray-900 dark:text-gray-100">{response.debug.confidenceSignals.topScore.toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500">2nd Score:</span>{' '}
-                    <span className="font-mono">{response.debug.confidenceSignals.secondScore.toFixed(2)}</span>
+                    <span className="text-gray-500 dark:text-gray-400">2nd Score:</span>{' '}
+                    <span className="font-mono text-gray-900 dark:text-gray-100">{response.debug.confidenceSignals.secondScore.toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500">Score Gap:</span>{' '}
-                    <span className="font-mono">{response.debug.confidenceSignals.scoreGap.toFixed(2)}</span>
+                    <span className="text-gray-500 dark:text-gray-400">Score Gap:</span>{' '}
+                    <span className="font-mono text-gray-900 dark:text-gray-100">{response.debug.confidenceSignals.scoreGap.toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500">Docs Count:</span>{' '}
-                    <span className="font-mono">{response.debug.confidenceSignals.docsCount}</span>
+                    <span className="text-gray-500 dark:text-gray-400">Docs Count:</span>{' '}
+                    <span className="font-mono text-gray-900 dark:text-gray-100">{response.debug.confidenceSignals.docsCount}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500">KB Count:</span>{' '}
-                    <span className="font-mono">{response.debug.confidenceSignals.kbCount}</span>
+                    <span className="text-gray-500 dark:text-gray-400">KB Count:</span>{' '}
+                    <span className="font-mono text-gray-900 dark:text-gray-100">{response.debug.confidenceSignals.kbCount}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500">Docs Top1:</span>{' '}
-                    <span className="font-mono">{response.debug.confidenceSignals.hasDocsTop1 ? 'Yes' : 'No'}</span>
+                    <span className="text-gray-500 dark:text-gray-400">Docs Top1:</span>{' '}
+                    <span className="font-mono text-gray-900 dark:text-gray-100">{response.debug.confidenceSignals.hasDocsTop1 ? 'Yes' : 'No'}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500">Avg Top3:</span>{' '}
-                    <span className="font-mono">{response.debug.confidenceSignals.avgTop3Score.toFixed(2)}</span>
+                    <span className="text-gray-500 dark:text-gray-400">Avg Top3:</span>{' '}
+                    <span className="font-mono text-gray-900 dark:text-gray-100">{response.debug.confidenceSignals.avgTop3Score.toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500">Result Count:</span>{' '}
-                    <span className="font-mono">{response.debug.confidenceSignals.resultCount}</span>
+                    <span className="text-gray-500 dark:text-gray-400">Result Count:</span>{' '}
+                    <span className="font-mono text-gray-900 dark:text-gray-100">{response.debug.confidenceSignals.resultCount}</span>
                   </div>
                 </div>
               </div>
@@ -651,8 +651,8 @@ export default function PilotAnswerPage() {
           </details>
 
           {/* Raw JSON */}
-          <details className="bg-white border border-gray-200 rounded-lg">
-            <summary className="px-4 py-3 cursor-pointer text-sm font-medium text-gray-700 hover:bg-gray-50">
+          <details className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg">
+            <summary className="px-4 py-3 cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
               Raw JSON Response
             </summary>
             <pre className="p-4 bg-gray-900 text-gray-100 text-xs overflow-x-auto rounded-b-lg max-h-96">
@@ -668,8 +668,8 @@ export default function PilotAnswerPage() {
 /** Mode badge component */
 function ModeBadge({ mode }: { mode: 'answer' | 'ticket_draft' }) {
   const styles = {
-    answer: 'bg-green-100 text-green-800',
-    ticket_draft: 'bg-amber-100 text-amber-800',
+    answer: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300',
+    ticket_draft: 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300',
   };
 
   const labels = {
@@ -687,9 +687,9 @@ function ModeBadge({ mode }: { mode: 'answer' | 'ticket_draft' }) {
 /** Confidence badge component */
 function ConfidenceBadge({ confidence }: { confidence: ConfidenceLevel }) {
   const styles = {
-    high: 'bg-green-100 text-green-800 border-green-300',
-    medium: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-    low: 'bg-red-100 text-red-800 border-red-300',
+    high: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-300 dark:border-green-900/60',
+    medium: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-900/60',
+    low: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-900/60',
   };
 
   return (
@@ -702,8 +702,8 @@ function ConfidenceBadge({ confidence }: { confidence: ConfidenceLevel }) {
 /** Corpus badge component */
 function CorpusBadge({ corpus }: { corpus: 'docs' | 'kb' }) {
   const styles = {
-    docs: 'bg-blue-100 text-blue-800',
-    kb: 'bg-emerald-100 text-emerald-800',
+    docs: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300',
+    kb: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300',
   };
 
   return (

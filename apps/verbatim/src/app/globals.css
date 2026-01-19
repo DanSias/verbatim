@@ -1,1 +1,9 @@
 @import 'tailwindcss';
+
+/*
+ * Dark Mode Configuration (Tailwind v4)
+ *
+ * Uses class-based dark mode: add 'dark' class to <html> to activate.
+ * This overrides the default media-query based dark mode.
+ */
+@variant dark (&:where(.dark, .dark *));

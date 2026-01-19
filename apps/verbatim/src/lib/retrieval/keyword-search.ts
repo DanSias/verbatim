@@ -12,7 +12,7 @@
 
 import { db } from '@/lib/db';
 import type { Corpus } from '@prisma/client';
-import { tokenize, scoreChunk } from './scoring';
+import { tokenizeWithPhrases, scoreChunkWithPhrases } from './scoring';
 
 /** A retrieved chunk with its score and metadata */
 export interface RetrievedChunk {
@@ -48,10 +48,10 @@ export async function keywordSearch(
 ): Promise<RetrievedChunk[]> {
   const { workspaceId, question, topK, corpusScope } = options;
 
-  // Tokenize question
-  const queryTerms = tokenize(question);
+  // Tokenize question (with phrase extraction)
+  const { terms: queryTerms, phrases: queryPhrases } = tokenizeWithPhrases(question);
 
-  if (queryTerms.length === 0) {
+  if (queryTerms.length === 0 && queryPhrases.length === 0) {
     return [];
   }
 
@@ -78,9 +78,9 @@ export async function keywordSearch(
     },
   });
 
-  // Score each chunk
+  // Score each chunk (using phrase-aware scoring)
   const scoredChunks: RetrievedChunk[] = chunks.map((chunk) => {
-    const score = scoreChunk(chunk.content, chunk.headingPath, queryTerms);
+    const score = scoreChunkWithPhrases(chunk.content, chunk.headingPath, queryTerms, queryPhrases);
     return {
       chunkId: chunk.id,
       documentId: chunk.document.id,

@@ -10,80 +10,16 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  Home,
-  Layers,
-  UploadCloud,
-  FileText,
-  Search,
-  MessageSquareText,
-  Bot,
-  Plug,
-  BarChart3,
-  type LucideIcon,
-} from 'lucide-react';
 import { ThemeToggle } from '@/components/theme';
 import { WorkspaceSwitcher } from '@/components/workspace-switcher';
-
-/** Navigation item definition */
-interface NavItem {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  /** If true, only match exact pathname (not prefix) */
-  exactMatch?: boolean;
-}
-
-/** Navigation section with heading and items */
-interface NavSection {
-  heading: string;
-  items: NavItem[];
-}
-
-/** Navigation sections configuration */
-const NAV_SECTIONS: NavSection[] = [
-  {
-    heading: 'Overview',
-    items: [
-      { href: '/pilot', label: 'Pilot Home', icon: Home, exactMatch: true },
-    ],
-  },
-  {
-    heading: 'Core',
-    items: [
-      { href: '/pilot/workspaces', label: 'Workspaces', icon: Layers },
-      { href: '/pilot/ingest', label: 'Ingest', icon: UploadCloud },
-      { href: '/pilot/sources', label: 'Sources', icon: FileText },
-    ],
-  },
-  {
-    heading: 'Q&A',
-    items: [
-      { href: '/pilot/ask', label: 'Ask', icon: Search },
-      { href: '/pilot/answer', label: 'Answer', icon: MessageSquareText },
-    ],
-  },
-  {
-    heading: 'Widget',
-    items: [
-      { href: '/pilot/widget', label: 'Widget Demo', icon: Bot, exactMatch: true },
-      { href: '/pilot/widget/install', label: 'Widget Install', icon: Plug },
-    ],
-  },
-  {
-    heading: 'Analytics',
-    items: [
-      { href: '/pilot/usage', label: 'Usage', icon: BarChart3 },
-    ],
-  },
-];
+import { PILOT_NAV_SECTIONS, type PilotNavItem } from '@/lib/pilot/nav';
 
 /**
  * Check if a nav item is active based on current pathname.
  * - exactMatch: only match if pathname === href
  * - Otherwise: match if pathname === href OR pathname starts with href + "/"
  */
-function isNavItemActive(pathname: string, item: NavItem): boolean {
+function isNavItemActive(pathname: string, item: PilotNavItem): boolean {
   if (item.exactMatch) {
     return pathname === item.href;
   }
@@ -117,11 +53,11 @@ function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 px-3">
-        {NAV_SECTIONS.map((section) => (
-          <div key={section.heading} className="mb-6">
+        {PILOT_NAV_SECTIONS.map((section) => (
+          <div key={section.label} className="mb-6">
             {/* Section heading */}
             <h3 className="px-3 mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              {section.heading}
+              {section.label}
             </h3>
 
             {/* Section items */}

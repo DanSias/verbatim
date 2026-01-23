@@ -425,14 +425,14 @@ export default function PilotIngestPage() {
       )}
 
       {/* Fixtures reminder */}
-      <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
-        <p className="text-sm text-gray-600 dark:text-gray-300">
-          <strong>Tip:</strong> Test fixtures are in{' '}
-          <code className="bg-gray-200 dark:bg-gray-800 px-1 rounded">/fixtures/docs</code> and{' '}
-          <code className="bg-gray-200 dark:bg-gray-800 px-1 rounded">/fixtures/kb</code>. Use folder upload to
-          ingest them with correct paths.
+      <section className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/40 rounded-lg p-4">
+        <h2 className="text-sm font-medium text-amber-800 dark:text-amber-200">Testing with Fixtures</h2>
+        <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+          Test fixtures are in <code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded">/fixtures/docs</code>{' '}
+          and <code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded">/fixtures/kb</code>. Use folder upload
+          to preserve paths when ingesting.
         </p>
-      </div>
+      </section>
     </div>
   );
 }

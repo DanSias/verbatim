@@ -255,18 +255,67 @@ If unsure:
 
 ---
 
-## 11. Transition to Production
+## 11. Authentication Setup (Phase 9.2)
+
+### 11.1 Google OAuth Configuration
+
+To enable authentication, create Google OAuth credentials:
+
+1. Go to Google Cloud Console > APIs & Credentials
+2. Create a new OAuth 2.0 Client ID
+3. Set application type to "Web application"
+4. Add authorized redirect URIs:
+   - Development: `http://localhost:3000/api/auth/callback/google`
+   - Production: `https://your-domain.com/api/auth/callback/google`
+5. Copy Client ID and Client Secret to environment variables
+
+### 11.2 Environment Variables
+
+Required:
+```
+AUTH_SECRET="<generate with: openssl rand -base64 32>"
+GOOGLE_CLIENT_ID="<from Google Console>"
+GOOGLE_CLIENT_SECRET="<from Google Console>"
+```
+
+### 11.3 Access Control (Allowlists)
+
+Control who can sign in:
+
+```
+# Allow specific domains
+AUTH_ALLOWED_DOMAINS="company.com,partner.com"
+
+# Allow specific emails
+AUTH_ALLOWED_EMAILS="admin@example.com,user@company.com"
+```
+
+Behavior:
+- If both are empty: any Google account can sign in (OSS default)
+- If either is set: user must match an allowed domain or email
+
+### 11.4 User Roles
+
+Users are assigned a role upon first sign-in:
+- `admin`: Full access (default during pilot)
+- `member`: Standard access
+
+Role-based access control (RBAC) will be enforced in a future phase.
+
+---
+
+## 12. Transition to Production
 
 Before opening beyond the pilot:
 
-* Add SSO-based auth
+* ~~Add SSO-based auth~~ (Done - Phase 9.2)
 * Enforce per-user/per-org rate limits
 * Enable structured monitoring dashboards
 * Confirm ticket submission permissions
 
 ---
 
-## 12. Operator Principles
+## 13. Operator Principles
 
 * Prefer **deterministic re-ingest** over manual fixes.
 * Treat docs routes as the source of truth for navigation.

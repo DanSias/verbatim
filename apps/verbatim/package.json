@@ -16,6 +16,7 @@
     "ingest": "tsx scripts/bulk-ingest.ts"
   },
   "dependencies": {
+    "@auth/prisma-adapter": "^2.11.1",
     "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "^7.2.0",
     "@verbatim/contracts": "*",
@@ -27,6 +28,7 @@
     "mdast-util-to-string": "^4.0.0",
     "micromark-extension-mdxjs": "^3.0.0",
     "next": "^14.0.0",
+    "next-auth": "^5.0.0-beta.30",
     "pg": "^8.17.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

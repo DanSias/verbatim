@@ -9,10 +9,12 @@
 
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
-import { PILOT_NAV_SECTIONS } from '@/lib/pilot/nav';
+import { PILOT_NAV_SECTIONS, type PilotNavSection } from '@/lib/pilot/nav';
 
 export default function PilotPage() {
-  const cardSections = PILOT_NAV_SECTIONS.filter((section) => section.label !== 'Overview');
+  const cardSections: PilotNavSection[] = PILOT_NAV_SECTIONS.filter(
+    (section) => section.label !== 'Overview'
+  );
 
   return (
     <div className="space-y-6">

@@ -8,7 +8,7 @@
  * but this page still allows setting a workspace as active for convenience.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   useActiveWorkspace,
   setActiveWorkspaceInStorage,
@@ -19,6 +19,8 @@ interface Workspace {
   id: string;
   name: string;
   createdAt: string;
+  documentCount?: number;
+  chunkCount?: number;
 }
 
 async function readJsonOrText(res: Response) {
@@ -27,6 +29,33 @@ async function readJsonOrText(res: Response) {
     return { kind: 'json' as const, data: await res.json() };
   }
   return { kind: 'text' as const, data: await res.text() };
+}
+
+function formatRelativeTime(date: Date, now: Date = new Date()) {
+  const seconds = Math.round((now.getTime() - date.getTime()) / 1000);
+  const absSeconds = Math.abs(seconds);
+  const future = seconds < 0;
+
+  const minutes = Math.round(absSeconds / 60);
+  const hours = Math.round(absSeconds / 3600);
+  const days = Math.round(absSeconds / 86400);
+  const weeks = Math.round(absSeconds / 604800);
+  const months = Math.round(absSeconds / 2592000);
+
+  const format = (value: number, unit: string) =>
+    `${value} ${unit}${value === 1 ? '' : 's'} ${future ? 'from now' : 'ago'}`;
+
+  if (absSeconds < 60) return future ? 'in under a minute' : 'just now';
+  if (minutes < 60) return format(minutes, 'minute');
+  if (hours < 24) return format(hours, 'hour');
+  if (days < 7) return format(days, 'day');
+  if (weeks < 5) return format(weeks, 'week');
+  return format(months, 'month');
+}
+
+function shortenId(id: string) {
+  if (id.length <= 12) return id;
+  return `${id.slice(0, 8)}…${id.slice(-4)}`;
 }
 
 export default function PilotWorkspacesPage() {
@@ -271,11 +300,41 @@ function WorkspaceRow({
   onDeleteConfirm: () => void;
   onDeleteCancel: () => void;
 }) {
-  const createdAt = new Date(workspace.createdAt).toLocaleDateString();
+  const createdAtDate = new Date(workspace.createdAt);
+  const relativeCreatedAt = formatRelativeTime(createdAtDate);
+  const createdAtTitle = createdAtDate.toLocaleString();
+  const documentCount = workspace.documentCount ?? 0;
+  const chunkCount = workspace.chunkCount ?? 0;
+  const documentLabel = documentCount === 1 ? 'document' : 'documents';
+  const chunkLabel = chunkCount === 1 ? 'chunk' : 'chunks';
+  const shortId = shortenId(workspace.id);
+  const [copied, setCopied] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleCopyId = async () => {
+    try {
+      await navigator.clipboard.writeText(workspace.id);
+      setCopied(true);
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+      copyTimeoutRef.current = setTimeout(() => setCopied(false), 1200);
+    } catch {
+      // Ignore clipboard errors
+    }
+  };
 
   return (
     <div className={`px-4 py-3 ${isActive ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
-      <div className="flex items-center gap-4">
+      <div className="flex items-start gap-4">
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -286,15 +345,31 @@ function WorkspaceRow({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-gray-400">
-            <code className="font-mono">{workspace.id}</code>
-            <span>Created {createdAt}</span>
+          <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <span title={`Created ${createdAtTitle}`}>Created {relativeCreatedAt}</span>
+            <span>
+              {documentCount} {documentLabel} • {chunkCount} {chunkLabel}
+            </span>
+          </div>
+          <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-500">
+            <span className="font-mono" title={workspace.id}>
+              {shortId}
+            </span>
+            <button
+              type="button"
+              onClick={handleCopyId}
+              className="rounded px-1.5 py-0.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-800"
+              aria-label="Copy workspace ID"
+            >
+              Copy ID
+            </button>
+            {copied && <span className="text-green-600 dark:text-green-400">Copied</span>}
           </div>
         </div>
 
         {/* Actions */}
         {isConfirming ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pt-1">
             <span className="text-sm text-red-600 dark:text-red-400">Delete?</span>
             <button
               onClick={onDeleteConfirm}
@@ -312,7 +387,7 @@ function WorkspaceRow({
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pt-1">
             {!isActive && (
               <button
                 onClick={onSetActive}

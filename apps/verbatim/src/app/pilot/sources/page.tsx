@@ -8,10 +8,11 @@
  * Delete individual documents with confirmation.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useActiveWorkspace } from '@/components/workspace-switcher';
+import { ArrowRight, Trash2 } from 'lucide-react';
 
 /** Document from API */
 interface Document {
@@ -183,11 +184,19 @@ export default function PilotSourcesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Sources</h1>
-        <p className="mt-1 text-gray-600 dark:text-gray-300">
-          View documents ingested into the active workspace.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Content library</h1>
+          <p className="mt-1 text-gray-600 dark:text-gray-300">
+            Browse docs and knowledge base files uploaded to the active workspace.
+          </p>
+        </div>
+        <Link
+          href="/pilot/ingest"
+          className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
+        >
+          Add content
+        </Link>
       </div>
 
       {/* Success message */}
@@ -267,10 +276,21 @@ export default function PilotSourcesPage() {
             {loading ? (
               <div className="p-4 text-sm text-gray-500 dark:text-gray-400">Loading...</div>
             ) : documents.length === 0 ? (
-              <div className="p-4 text-sm text-gray-500 dark:text-gray-400">
-                {debouncedSearch || corpusFilter !== 'all'
-                  ? 'No documents match your filters.'
-                  : 'No documents yet. Use the Ingest page to add sources.'}
+              <div className="p-6 text-sm text-gray-500 dark:text-gray-400">
+                {debouncedSearch || corpusFilter !== 'all' ? (
+                  'No documents match your filters.'
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <span>No content yet. Upload docs or KB files to get started.</span>
+                    <Link
+                      href="/pilot/ingest"
+                      className="inline-flex w-fit items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
+                    >
+                      Add content
+                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="divide-y divide-gray-200 dark:divide-gray-800">
@@ -345,15 +365,32 @@ function DocumentRow({
   onDeleteConfirm: () => void;
   onDeleteCancel: () => void;
 }) {
+  const router = useRouter();
   const displayTitle = document.title || document.canonicalId;
   const updatedAt = new Date(document.updatedAt).toLocaleDateString();
+  const handleRowClick = () => {
+    router.push(`/pilot/sources/${document.id}`);
+  };
+  const handleRowKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleRowClick();
+    }
+  };
 
   return (
-    <div className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-      <div className="flex items-start gap-3">
+    <div
+      className="group px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+      role="button"
+      tabIndex={0}
+      onClick={handleRowClick}
+      onKeyDown={handleRowKeyDown}
+      aria-label={`View ${displayTitle}`}
+    >
+      <div className="flex items-center gap-3">
         {/* Corpus badge */}
         <span
-          className={`mt-0.5 px-1.5 py-0.5 text-xs font-medium rounded ${
+          className={`inline-flex h-6 min-w-10 items-center justify-center rounded text-xs font-medium uppercase tracking-wide ${
             document.corpus === 'docs'
               ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
               : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
@@ -362,38 +399,43 @@ function DocumentRow({
           {document.corpus}
         </span>
 
-        {/* Document info - clickable link */}
-        <Link
-          href={`/pilot/sources/${document.id}`}
-          className="flex-1 min-w-0 group"
-        >
-          <div className="font-medium text-gray-900 dark:text-gray-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
+        {/* Document info */}
+        <div className="flex-1 min-w-0">
+          <div className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
             {displayTitle}
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-gray-500 dark:text-gray-400">
             {document.route && (
-              <span className="font-mono bg-gray-100 dark:bg-gray-800 px-1 rounded">
+              <span className="font-mono bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
                 {document.route}
               </span>
             )}
             <span>{document.chunkCount} chunks</span>
             <span>Updated {updatedAt}</span>
           </div>
-        </Link>
+        </div>
 
         {/* Actions */}
         {isConfirming ? (
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-sm text-red-600 dark:text-red-400">Delete?</span>
             <button
-              onClick={onDeleteConfirm}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onDeleteConfirm();
+              }}
               disabled={isDeleting}
               className="px-3 py-1 bg-red-600 text-white text-xs font-medium rounded hover:bg-red-700 disabled:bg-gray-400 dark:disabled:bg-gray-600"
             >
               {isDeleting ? 'Deleting...' : 'Yes'}
             </button>
             <button
-              onClick={onDeleteCancel}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onDeleteCancel();
+              }}
               disabled={isDeleting}
               className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-medium rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
             >
@@ -403,16 +445,24 @@ function DocumentRow({
         ) : (
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={onDeleteClick}
-              className="px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs font-medium rounded hover:bg-red-200 dark:hover:bg-red-900/50"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onDeleteClick();
+              }}
+              className="inline-flex items-center justify-center rounded-md p-2 text-red-600 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:text-red-400 dark:hover:bg-red-900/30"
+              aria-label="Delete source"
+              title="Delete"
             >
-              Delete
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
             </button>
             <Link
               href={`/pilot/sources/${document.id}`}
-              className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+              className="inline-flex items-center justify-center rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+              aria-label="View source"
+              title="View source"
             >
-              &rarr;
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>
         )}

@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useActiveWorkspace } from '@/components/workspace-switcher';
+import Link from 'next/link';
 
 /** LocalStorage keys for non-workspace settings */
 const LS_CORPUS = 'verbatim_pilot_ingestCorpus';
@@ -66,6 +67,8 @@ export default function PilotIngestPage() {
   useEffect(() => {
     if (activeWorkspace?.id) {
       setWorkspaceId(activeWorkspace.id);
+    } else {
+      setWorkspaceId('');
     }
   }, [activeWorkspace?.id]);
 
@@ -199,35 +202,46 @@ export default function PilotIngestPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Ingest Documents</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Upload content</h1>
         <p className="mt-1 text-gray-600 dark:text-gray-300">
-          Upload docs (MDX) or KB (Markdown) files to a workspace.
+          Add docs or knowledge base files to the active workspace for retrieval and answers.
         </p>
       </div>
 
       {/* Form */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 space-y-6">
-        {/* Workspace ID */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Workspace ID</label>
-          <input
-            type="text"
-            value={workspaceId}
-            onChange={(e) => setWorkspaceId(e.target.value)}
-            placeholder={activeWorkspace ? 'Using active workspace' : 'Select workspace in sidebar'}
-            className="w-full px-3 py-2 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900"
-            disabled={uploading}
-          />
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {activeWorkspace
-              ? 'Using active workspace from sidebar. You can also enter a different ID.'
-              : 'Select a workspace in the sidebar, or enter an ID manually.'}
-          </p>
-        </div>
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 space-y-5">
+        {/* Active workspace */}
+        {activeWorkspace ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 dark:border-gray-800 pb-4">
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              Uploading to: {activeWorkspace.name}
+            </span>
+            <Link
+              href="/pilot/workspaces"
+              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Change
+            </Link>
+          </div>
+        ) : (
+          <div className="border border-gray-200 dark:border-gray-800 rounded-lg bg-gray-50 dark:bg-gray-950 p-4">
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              Select a workspace to upload documents.
+            </p>
+            <Link
+              href="/pilot/workspaces"
+              className="mt-2 inline-flex text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Go to Workspaces
+            </Link>
+          </div>
+        )}
 
         {/* Corpus selector */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Corpus</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Content type
+          </label>
           <div className="flex gap-6">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -239,7 +253,7 @@ export default function PilotIngestPage() {
                 disabled={uploading}
                 className="text-blue-600 focus:ring-blue-500"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">docs</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">Docs site (MDX)</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -251,21 +265,19 @@ export default function PilotIngestPage() {
                 disabled={uploading}
                 className="text-blue-600 focus:ring-blue-500"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">kb</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                Knowledge base (Markdown)
+              </span>
             </label>
           </div>
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
             {corpus === 'docs' ? (
               <>
-                <strong>docs:</strong> Only{' '}
-                <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">page.mdx</code> files. Route derived from
-                relative path.
+                Imports Next.js docs routes (expects{' '}
+                <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">page.mdx</code>).
               </>
             ) : (
-              <>
-                <strong>kb:</strong> All <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">.md</code>{' '}
-                files. Identity derived from relative path. No routes.
-              </>
+              <>Imports standalone markdown notes for internal KB.</>
             )}
           </p>
         </div>
@@ -283,18 +295,22 @@ export default function PilotIngestPage() {
               disabled={uploading}
               className="text-blue-600 focus:ring-blue-500 rounded"
             />
-            <span className="text-sm text-gray-700 dark:text-gray-300">Folder upload (Chrome/Edge)</span>
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              Preserve folder structure (recommended)
+            </span>
           </label>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             {useFolderUpload
-              ? 'Select a folder to preserve relative paths for route/sourcePath derivation.'
-              : 'Select individual files (paths will be flat).'}
+              ? 'Uses folder upload when supported to keep routes/source paths intact.'
+              : 'Select individual files when folder upload is not available.'}
           </p>
         </div>
 
         {/* File selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Files</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Files
+          </label>
 
           {useFolderUpload ? (
             <input
@@ -341,7 +357,9 @@ export default function PilotIngestPage() {
                       {relativePath}
                     </li>
                   ))}
-                  {remainingCount > 0 && <li className="text-gray-400 dark:text-gray-500">+{remainingCount} more</li>}
+                  {remainingCount > 0 && (
+                    <li className="text-gray-400 dark:text-gray-500">+{remainingCount} more</li>
+                  )}
                 </ul>
               </div>
             </div>
@@ -349,15 +367,25 @@ export default function PilotIngestPage() {
         </div>
 
         {/* Upload button */}
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={handleUpload}
-            disabled={uploading || selectedFiles.length === 0}
-            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
+            disabled={uploading || selectedFiles.length === 0 || !workspaceId.trim()}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
           >
+            {uploading && (
+              <span className="h-4 w-4 rounded-full border-2 border-white/70 border-t-transparent animate-spin" />
+            )}
             {uploading ? 'Uploading...' : 'Upload'}
           </button>
-          {uploadProgress && <span className="text-sm text-gray-600 dark:text-gray-400">{uploadProgress}</span>}
+          {uploadProgress && (
+            <span className="text-sm text-gray-600 dark:text-gray-400">{uploadProgress}</span>
+          )}
+          {!workspaceId.trim() && (
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              Select an active workspace to enable upload.
+            </span>
+          )}
         </div>
       </div>
 
@@ -393,9 +421,15 @@ export default function PilotIngestPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
                 <tr>
-                  <th className="text-left px-3 py-2 font-medium text-gray-700 dark:text-gray-300">File</th>
-                  <th className="text-left px-3 py-2 font-medium text-gray-700 dark:text-gray-300">Status</th>
-                  <th className="text-left px-3 py-2 font-medium text-gray-700 dark:text-gray-300">Details</th>
+                  <th className="text-left px-3 py-2 font-medium text-gray-700 dark:text-gray-300">
+                    File
+                  </th>
+                  <th className="text-left px-3 py-2 font-medium text-gray-700 dark:text-gray-300">
+                    Status
+                  </th>
+                  <th className="text-left px-3 py-2 font-medium text-gray-700 dark:text-gray-300">
+                    Details
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -412,9 +446,13 @@ export default function PilotIngestPage() {
                         <span className="font-mono">{result.canonicalId}</span>
                       )}
                       {result.status === 'ok' && result.route && (
-                        <span className="ml-2 text-blue-600 dark:text-blue-400">{result.route}</span>
+                        <span className="ml-2 text-blue-600 dark:text-blue-400">
+                          {result.route}
+                        </span>
                       )}
-                      {result.error && <span className="text-red-600 dark:text-red-400">{result.error}</span>}
+                      {result.error && (
+                        <span className="text-red-600 dark:text-red-400">{result.error}</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -425,12 +463,12 @@ export default function PilotIngestPage() {
       )}
 
       {/* Fixtures reminder */}
-      <section className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/40 rounded-lg p-4">
-        <h2 className="text-sm font-medium text-amber-800 dark:text-amber-200">Testing with Fixtures</h2>
-        <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
-          Test fixtures are in <code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded">/fixtures/docs</code>{' '}
-          and <code className="bg-amber-100 dark:bg-amber-900/40 px-1 rounded">/fixtures/kb</code>. Use folder upload
-          to preserve paths when ingesting.
+      <section className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+        <p className="text-sm text-gray-600 dark:text-gray-300">
+          Fixtures are available in{' '}
+          <code className="bg-gray-200 dark:bg-gray-800 px-1 rounded">/fixtures/docs</code> and{' '}
+          <code className="bg-gray-200 dark:bg-gray-800 px-1 rounded">/fixtures/kb</code>. Use
+          folder upload to preserve paths.
         </p>
       </section>
     </div>

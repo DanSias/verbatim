@@ -278,7 +278,23 @@ GOOGLE_CLIENT_ID="<from Google Console>"
 GOOGLE_CLIENT_SECRET="<from Google Console>"
 ```
 
-### 11.3 Access Control (Allowlists)
+### 11.3 Database Setup
+
+After configuring environment variables, initialize the database schema:
+
+```bash
+# Generate Prisma client with Auth.js models
+npm run db:generate
+
+# Push schema to database (creates tables if they don't exist)
+npm run db:push
+```
+
+This creates the required Auth.js tables: `users`, `accounts`, `sessions`, `verification_tokens`.
+
+**Important:** Run `db:push` before starting the dev server for the first time with authentication enabled.
+
+### 11.4 Access Control (Allowlists)
 
 Control who can sign in:
 
@@ -294,13 +310,81 @@ Behavior:
 - If both are empty: any Google account can sign in (OSS default)
 - If either is set: user must match an allowed domain or email
 
-### 11.4 User Roles
+### 11.5 User Roles
 
 Users are assigned a role upon first sign-in:
 - `admin`: Full access (default during pilot)
 - `member`: Standard access
 
 Role-based access control (RBAC) will be enforced in a future phase.
+
+---
+
+## 11.6 Widget Authentication (Planned - Phase 9.4)
+
+### Overview
+
+Widget authentication uses **API keys** instead of OAuth for non-interactive usage.
+
+**Why not OAuth for widgets?**
+- Widgets run on third-party domains without browser session access
+- OAuth requires interactive redirects (incompatible with embedded widgets)
+- API keys provide simple, portable authentication for server-to-server calls
+
+### API Key Model
+
+API keys are workspace-scoped credentials stored in the database:
+
+- **Format**: `vbm_<64-char-hex>` (256 bits of entropy)
+- **Storage**: Only hashed keys stored (SHA-256)
+- **Plaintext**: Shown once on creation, never retrievable
+- **Revocation**: `revokedAt` timestamp for key invalidation
+
+### Current Status (Phase 9.4 - Foundation Only)
+
+**What's implemented:**
+- ✅ Prisma schema includes `ApiKey` model
+- ✅ API key utilities available (`generateApiKey`, `hashApiKey`, `verifyApiKey`)
+- ✅ Widget accepts `Authorization: Bearer <api-key>` header (passively parsed)
+
+**What's NOT enforced yet:**
+- ❌ Keys are NOT validated against database
+- ❌ Keys are NOT required
+- ❌ No UI for key management
+- ❌ No workspace permissions enforcement
+
+**Demo mode still works:**
+- Widget can be used without authentication
+- Workspace ID comes from `WIDGET_DEFAULT_WORKSPACE_ID` env var
+- No breaking changes to existing widget usage
+
+### Future Enforcement (Not Yet Implemented)
+
+Future phases will add:
+1. **Validation**: Verify API keys against database hashes
+2. **Enforcement**: Require valid API key for production widget usage
+3. **Permissions**: Workspace-scoped access control
+4. **Management UI**: Pilot UI for creating/revoking keys
+5. **Usage tracking**: Per-key rate limiting and analytics
+
+### Integration Example (Future)
+
+Once enforcement is active, widget usage will require:
+
+```javascript
+// Docs site widget configuration
+const widget = new VerbatimWidget({
+  apiKey: 'vbm_...',  // Required in production
+  workspaceId: 'cuid_...',  // Optional override
+});
+```
+
+Server-side proxy (docs repo):
+```bash
+# .env
+VERBATIM_API_KEY=vbm_...
+VERBATIM_BASE_URL=https://verbatim.example.com
+```
 
 ---
 

@@ -12,6 +12,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ThemeToggle } from '@/components/theme';
 import { WorkspaceSwitcher } from '@/components/workspace-switcher';
+import { SessionProvider } from '@/components/auth/session-provider';
+import { UserMenu } from '@/components/auth/user-menu';
 import { PILOT_NAV_SECTIONS, type PilotNavItem } from '@/lib/pilot/nav';
 
 /**
@@ -97,6 +99,9 @@ function Sidebar() {
           </div>
         ))}
       </nav>
+
+      {/* User menu (sign out) */}
+      <UserMenu />
     </aside>
   );
 }
@@ -107,16 +112,18 @@ export default function PilotLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950">
-      {/* Sidebar */}
-      <Sidebar />
+    <SessionProvider>
+      <div className="min-h-screen bg-white dark:bg-gray-950">
+        {/* Sidebar */}
+        <Sidebar />
 
-      {/* Main content area */}
-      <main className="ml-[260px] min-h-screen">
-        <div className="max-w-4xl mx-auto px-8 py-8">
-          {children}
-        </div>
-      </main>
-    </div>
+        {/* Main content area */}
+        <main className="ml-[260px] min-h-screen">
+          <div className="max-w-6xl mx-auto px-8 py-8">
+            {children}
+          </div>
+        </main>
+      </div>
+    </SessionProvider>
   );
 }

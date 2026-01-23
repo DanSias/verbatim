@@ -2,7 +2,8 @@
  * Auth.js (NextAuth v5) Configuration
  *
  * Provides Google OAuth authentication with Prisma adapter.
- * Includes email allowlist enforcement and user role in session.
+ * Uses JWT sessions for edge middleware compatibility.
+ * User and Account records are still persisted to database via adapter.
  */
 
 import NextAuth from 'next-auth';
@@ -15,6 +16,8 @@ import { isEmailAllowed } from '@/lib/auth/allowlist';
 // Import type augmentations for session.user.id and session.user.role
 import '@/lib/auth/types';
 
+const debug = process.env.AUTH_DEBUG === '1';
+
 /**
  * Initialize NextAuth with configuration
  */
@@ -26,9 +29,10 @@ const authResult: NextAuthResult = NextAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
   ],
-  // Use database sessions (required for Prisma adapter with user roles)
+  // Use JWT sessions for edge middleware compatibility
+  // User/Account records still persist to database via adapter
   session: {
-    strategy: 'database',
+    strategy: 'jwt',
   },
   callbacks: {
     /**
@@ -38,26 +42,56 @@ const authResult: NextAuthResult = NextAuth({
     async signIn({ user }) {
       const allowed = isEmailAllowed(user.email);
       if (!allowed) {
-        // Log rejection for debugging
-        console.warn(`[auth] Sign-in rejected for email: ${user.email}`);
-        return false;
+        if (debug) {
+          console.warn(`[auth] Sign-in rejected for email: ${user.email}`);
+        }
+        // Redirect to not-authorized instead of showing error
+        return '/auth/not-authorized';
+      }
+      if (debug) {
+        console.log(`[auth] Sign-in allowed for email: ${user.email}`);
       }
       return true;
     },
 
     /**
-     * session callback - include user.id and user.role in session
-     * This runs every time the session is checked
+     * jwt callback - populate JWT token with user data for edge middleware
+     * This runs when the token is created or updated
      */
-    async session({ session, user }) {
-      if (session.user) {
-        session.user.id = user.id;
-        // Fetch role from database user record
+    async jwt({ token, user }) {
+      // On sign-in, copy user data to token
+      if (user) {
+        token.id = user.id;
+        token.email = user.email;
+        token.name = user.name;
+        token.picture = user.image;
+
+        // Fetch role from database
         const dbUser = await db.user.findUnique({
           where: { id: user.id },
           select: { role: true },
         });
-        session.user.role = dbUser?.role ?? 'member';
+        token.role = dbUser?.role ?? 'member';
+
+        if (debug) {
+          console.log(`[auth] JWT created for user ${user.id}, role: ${token.role}`);
+        }
+      }
+
+      return token;
+    },
+
+    /**
+     * session callback - expose user data in session
+     * This runs every time the session is checked
+     */
+    async session({ session, token }) {
+      if (session.user && token) {
+        session.user.id = token.id as string;
+        session.user.email = token.email as string;
+        session.user.name = token.name as string;
+        session.user.image = token.picture as string;
+        session.user.role = (token.role as string) ?? 'member';
       }
       return session;
     },

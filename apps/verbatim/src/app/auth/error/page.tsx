@@ -6,12 +6,13 @@
 
 import Link from 'next/link';
 
-export default function AuthErrorPage({
-  searchParams,
-}: {
-  searchParams: { error?: string };
-}) {
-  const error = searchParams.error;
+interface AuthErrorPageProps {
+  searchParams: Promise<{ error?: string }>;
+}
+
+export default async function AuthErrorPage({ searchParams }: AuthErrorPageProps) {
+  const params = await searchParams;
+  const error = params.error;
 
   // Map NextAuth error codes to user-friendly messages
   const errorMessages: Record<string, string> = {
@@ -51,7 +52,7 @@ export default function AuthErrorPage({
 
           <div className="space-y-3">
             <Link
-              href="/api/auth/signin"
+              href="/auth/signin"
               className="block w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors"
             >
               Try Again

@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useActiveWorkspace } from '@/components/workspace-switcher';
+import { toFriendlyError, type FriendlyError } from '@/lib/ui/errors';
 
 /** LocalStorage keys for non-workspace settings */
 const LS_TOP_K = 'verbatim_pilot_answer_topK';
@@ -78,12 +79,29 @@ interface AnswerResponse {
   };
 }
 
+interface WorkspaceStats {
+  documentCount: number;
+  chunkCount: number;
+}
+
+interface WorkspaceWithCounts {
+  id: string;
+  name: string;
+  documentCount?: number;
+  chunkCount?: number;
+}
+
 export default function PilotAnswerPage() {
   // Active workspace from shared hook
   const { activeWorkspace } = useActiveWorkspace();
 
-  // Form state - workspace ID initialized from active workspace
-  const [workspaceId, setWorkspaceId] = useState('');
+  const workspaceId = activeWorkspace?.id || '';
+
+  // Workspace stats
+  const [workspaceStats, setWorkspaceStats] = useState<WorkspaceStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState<string | null>(null);
+
   const [question, setQuestion] = useState('');
   const [corpusScope, setCorpusScope] = useState<{ docs: boolean; kb: boolean }>({
     docs: true,
@@ -96,16 +114,69 @@ export default function PilotAnswerPage() {
 
   // Request state
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FriendlyError | null>(null);
   const [response, setResponse] = useState<AnswerResponse | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Sync workspace ID from active workspace
-  useEffect(() => {
-    if (activeWorkspace?.id) {
-      setWorkspaceId(activeWorkspace.id);
+  const readJsonOrText = useCallback(async (res: Response) => {
+    const ct = res.headers.get('content-type') || '';
+    if (ct.includes('application/json')) {
+      return { kind: 'json' as const, data: await res.json() };
     }
-  }, [activeWorkspace?.id]);
+    return { kind: 'text' as const, data: await res.text() };
+  }, []);
+
+  // Fetch active workspace stats
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchStats = async () => {
+      if (!workspaceId) {
+        setWorkspaceStats(null);
+        setStatsError(null);
+        return;
+      }
+
+      setStatsLoading(true);
+      setStatsError(null);
+
+      try {
+        const res = await fetch('/api/workspaces', {
+          headers: { Accept: 'application/json' },
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data?.error || 'Failed to fetch workspace stats');
+        }
+
+        const list = Array.isArray(data.workspaces) ? (data.workspaces as WorkspaceWithCounts[]) : [];
+        const match = list.find((ws) => ws.id === workspaceId);
+
+        if (!cancelled) {
+          setWorkspaceStats({
+            documentCount: match?.documentCount ?? 0,
+            chunkCount: match?.chunkCount ?? 0,
+          });
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setWorkspaceStats(null);
+          setStatsError(err instanceof Error ? err.message : 'Failed to load stats');
+        }
+      } finally {
+        if (!cancelled) {
+          setStatsLoading(false);
+        }
+      }
+    };
+
+    fetchStats();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId]);
 
   // Load persisted non-workspace settings
   useEffect(() => {
@@ -144,11 +215,11 @@ export default function PilotAnswerPage() {
   // Handle form submission
   const handleSubmit = useCallback(async () => {
     if (!workspaceId.trim()) {
-      setError('Workspace ID is required');
+      setError(toFriendlyError({ code: 'VALIDATION_ERROR', error: 'Workspace is required' }));
       return;
     }
     if (!question.trim()) {
-      setError('Question is required');
+      setError(toFriendlyError({ code: 'VALIDATION_ERROR', error: 'Question is required' }));
       return;
     }
 
@@ -157,7 +228,7 @@ export default function PilotAnswerPage() {
     if (corpusScope.kb) scope.push('kb');
 
     if (scope.length === 0) {
-      setError('Select at least one corpus');
+      setError(toFriendlyError({ code: 'VALIDATION_ERROR', error: 'Select at least one corpus' }));
       return;
     }
 
@@ -188,20 +259,29 @@ export default function PilotAnswerPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
       });
-
-      const data = await res.json();
+      const parsed = await readJsonOrText(res);
 
       if (!res.ok) {
-        setError(data.error || `HTTP ${res.status}`);
+        const input =
+          parsed.kind === 'json'
+            ? {
+                ...(parsed.data as Record<string, unknown>),
+                status: res.status,
+                provider,
+              }
+            : { error: parsed.data, status: res.status, provider };
+        setError(toFriendlyError(input));
+      } else if (parsed.kind === 'json') {
+        setResponse(parsed.data as AnswerResponse);
       } else {
-        setResponse(data);
+        setError(toFriendlyError({ error: 'Unexpected server response', status: res.status }));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Request failed');
+      setError(toFriendlyError(err));
     } finally {
       setLoading(false);
     }
-  }, [workspaceId, question, topK, corpusScope, provider, forceTicketDraft, minConfidence]);
+  }, [workspaceId, question, topK, corpusScope, provider, forceTicketDraft, minConfidence, readJsonOrText]);
 
   // Handle Enter key in textarea
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -257,27 +337,44 @@ export default function PilotAnswerPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Answer</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          Answer: Generate a Response
+        </h1>
         <p className="mt-1 text-gray-600 dark:text-gray-300">
-          Get LLM-synthesized answers with citations, confidence scoring, and ticket drafts.
+          Generate a cited answer from your workspace using retrieved context and an LLM.
         </p>
       </div>
 
       {/* Form */}
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 space-y-4">
-        {/* Workspace ID */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Workspace ID
-          </label>
-          <input
-            type="text"
-            value={workspaceId}
-            onChange={(e) => setWorkspaceId(e.target.value)}
-            placeholder={activeWorkspace ? 'Using active workspace' : 'Select workspace in sidebar'}
-            className="w-full px-3 py-2 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900"
-            disabled={loading}
-          />
+        {/* Active workspace */}
+        <div className="border-b border-gray-200 dark:border-gray-800 pb-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              {activeWorkspace
+                ? `${activeWorkspace.name} Workspace`
+                : 'No active workspace selected'}
+            </span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {statsLoading && 'Loading workspace stats...'}
+              {!statsLoading && workspaceStats && (
+                <>
+                  {workspaceStats.documentCount} documents • {workspaceStats.chunkCount} chunks
+                </>
+              )}
+              {!statsLoading && !workspaceStats && !statsError && '0 documents • 0 chunks'}
+            </span>
+          </div>
+          {!activeWorkspace && (
+            <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              Select or create a workspace using the sidebar switcher.
+            </div>
+          )}
+          {statsError && (
+            <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+              Unable to load workspace stats. Answering still works.
+            </p>
+          )}
         </div>
 
         {/* Question */}
@@ -317,10 +414,10 @@ export default function PilotAnswerPage() {
             </select>
           </div>
 
-          {/* Corpus scope */}
+          {/* Search in */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Corpus Scope
+              Search in
             </label>
             <div className="flex gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -333,7 +430,7 @@ export default function PilotAnswerPage() {
                   disabled={loading}
                   className="text-blue-600 focus:ring-blue-500 rounded"
                 />
-                <span className="text-sm text-gray-700 dark:text-gray-300">docs</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300">Docs</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -345,25 +442,31 @@ export default function PilotAnswerPage() {
                   disabled={loading}
                   className="text-blue-600 focus:ring-blue-500 rounded"
                 />
-                <span className="text-sm text-gray-700 dark:text-gray-300">kb</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300">Knowledge Base</span>
               </label>
             </div>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Choose which sources to search.
+            </p>
           </div>
 
-          {/* Top K */}
+          {/* Results to consider */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Top K
+              Results to consider
             </label>
             <input
               type="number"
               value={topK}
               onChange={(e) => setTopK(parseInt(e.target.value, 10) || 6)}
               min={1}
-              max={20}
+              max={10}
               className="w-20 px-3 py-1.5 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900"
               disabled={loading}
             />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Higher values may add context but can increase latency and cost.
+            </p>
           </div>
         </div>
 
@@ -407,21 +510,20 @@ export default function PilotAnswerPage() {
         {/* Submit button */}
         <button
           onClick={handleSubmit}
-          disabled={loading}
+          disabled={loading || !workspaceId.trim()}
           className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
         >
           {loading ? 'Generating...' : 'Get Answer'}
         </button>
+        {!workspaceId.trim() && (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Select an active workspace to enable answering.
+          </p>
+        )}
       </div>
 
       {/* Error display */}
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 rounded-lg p-4">
-          <p className="text-sm text-red-700 dark:text-red-200">
-            <strong>Error:</strong> {error}
-          </p>
-        </div>
-      )}
+      {error && <FriendlyErrorBanner error={error} />}
 
       {/* Response display */}
       {response && (
@@ -648,6 +750,46 @@ export default function PilotAnswerPage() {
           </details>
         </div>
       )}
+    </div>
+  );
+}
+
+function FriendlyErrorBanner({ error }: { error: FriendlyError }) {
+  const metaParts = [
+    error.provider ? `Provider: ${error.provider}` : null,
+    error.model ? `Model: ${error.model}` : null,
+    error.requestId ? `Request ID: ${error.requestId}` : null,
+    typeof error.status === 'number' ? `Status: ${error.status}` : null,
+    error.code ? `Code: ${error.code}` : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 rounded-lg p-4 space-y-2">
+      <div>
+        <h2 className="text-sm font-semibold text-red-800 dark:text-red-200">{error.title}</h2>
+        <p className="text-sm text-red-700 dark:text-red-300">{error.message}</p>
+        {error.action && (
+          <p className="mt-1 text-xs text-red-700 dark:text-red-300">{error.action}</p>
+        )}
+      </div>
+      {metaParts.length > 0 && (
+        <p className="text-xs text-red-700/80 dark:text-red-300/80">{metaParts.join(' | ')}</p>
+      )}
+      <details className="text-xs text-red-700 dark:text-red-300">
+        <summary className="cursor-pointer">Details</summary>
+        <div className="mt-2 space-y-2">
+          {error.raw && (
+            <pre className="whitespace-pre-wrap rounded bg-white/60 dark:bg-black/20 border border-red-200/60 dark:border-red-900/40 p-2 text-[11px] text-red-800 dark:text-red-200">
+              {error.raw}
+            </pre>
+          )}
+          {error.details && (
+            <pre className="whitespace-pre-wrap rounded bg-white/60 dark:bg-black/20 border border-red-200/60 dark:border-red-900/40 p-2 text-[11px] text-red-800 dark:text-red-200">
+              {JSON.stringify(error.details, null, 2)}
+            </pre>
+          )}
+        </div>
+      </details>
     </div>
   );
 }

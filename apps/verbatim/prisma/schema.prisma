@@ -25,6 +25,7 @@ model Workspace {
 
   documents     Document[]
   conversations Conversation[]
+  apiKeys       ApiKey[]
 
   @@map("workspaces")
 }
@@ -215,6 +216,33 @@ model QueryEvent {
 }
 
 // ============================================================================
+// Phase 9.4: API Keys (Widget & API Authentication)
+// Non-interactive authentication for widget and API usage
+// ============================================================================
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Security: store only hashed key
+  // Plaintext key shown once on creation
+  hashedKey String @unique
+
+  // Human-readable label for key identification
+  label String
+
+  // Revocation
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([workspaceId])
+  @@index([hashedKey])
+  @@map("api_keys")
+}
+
+// ============================================================================
 // Phase 9.2: Authentication (NextAuth / Auth.js)
 // Standard NextAuth models with User.role for future RBAC
 // ============================================================================
@@ -237,8 +265,6 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@map("users")
 }
 
 model Account {
@@ -261,7 +287,6 @@ model Account {
   updatedAt DateTime @updatedAt
 
   @@unique([provider, providerAccountId])
-  @@map("accounts")
 }
 
 model Session {
@@ -274,8 +299,6 @@ model Session {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@map("sessions")
 }
 
 model VerificationToken {
@@ -284,5 +307,4 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
-  @@map("verification_tokens")
 }

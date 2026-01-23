@@ -33,6 +33,7 @@ import {
 } from '@/lib/http';
 import { logQueryEventAsync } from '@/lib/logging';
 import { extractUsageFromUpstreamResponse, type LLMProviderName } from '@/lib/llm';
+import { isValidApiKeyFormat } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
@@ -113,6 +114,40 @@ function resolveWorkspaceId(request: NextRequest, defaultWorkspaceId?: string): 
 }
 
 /**
+ * Extract API key from Authorization header (Phase 9.4)
+ * Format: Authorization: Bearer <api-key>
+ *
+ * Returns null if:
+ * - Header is missing
+ * - Header format is invalid
+ * - API key format is invalid
+ *
+ * IMPORTANT: This is passive parsing only - NOT enforced yet.
+ * Future phases will add validation and enforcement.
+ */
+function extractApiKey(request: NextRequest): string | null {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader) {
+    return null;
+  }
+
+  // Parse Bearer token
+  const parts = authHeader.trim().split(' ');
+  if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer') {
+    return null;
+  }
+
+  const apiKey = parts[1].trim();
+
+  // Validate format (but don't verify against database yet)
+  if (!isValidApiKeyFormat(apiKey)) {
+    return null;
+  }
+
+  return apiKey;
+}
+
+/**
  * Build upstream URL based on mode.
  */
 function buildUpstreamUrl(
@@ -177,6 +212,11 @@ export async function POST(request: NextRequest) {
         'workspaceId is required: set WIDGET_DEFAULT_WORKSPACE_ID or pass x-verbatim-workspace-id header'
       );
     }
+
+    // Extract API key from Authorization header (Phase 9.4 - passive, not enforced)
+    // This prepares the surface for future authentication enforcement
+    const _apiKey = extractApiKey(request);
+    // TODO: Future phases will validate _apiKey against database and enforce workspace permissions
 
     // Build upstream URL
     const upstreamResult = buildUpstreamUrl(request, config.upstreamMode, config.verbatimBaseUrl);

@@ -18,6 +18,8 @@ interface WorkspaceResponse {
   id: string;
   name: string;
   createdAt: string;
+  documentCount: number;
+  chunkCount: number;
 }
 
 /** Error response shape */
@@ -32,19 +34,55 @@ interface ApiError {
  */
 export async function GET() {
   try {
-    const workspaces = await db.workspace.findMany({
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        name: true,
-        createdAt: true,
-      },
-    });
+    const [workspaces, documentCounts, chunkCountsByDocument] = await Promise.all([
+      db.workspace.findMany({
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          createdAt: true,
+        },
+      }),
+      db.document.groupBy({
+        by: ['workspaceId'],
+        _count: { _all: true },
+      }),
+      db.chunk.groupBy({
+        by: ['documentId'],
+        _count: { _all: true },
+      }),
+    ]);
+
+    const documentCountMap = new Map<string, number>();
+    for (const entry of documentCounts) {
+      documentCountMap.set(entry.workspaceId, entry._count._all);
+    }
+
+    const chunkCountMap = new Map<string, number>();
+    if (chunkCountsByDocument.length > 0) {
+      const documentIds = chunkCountsByDocument.map((entry) => entry.documentId);
+      const documents = await db.document.findMany({
+        where: { id: { in: documentIds } },
+        select: { id: true, workspaceId: true },
+      });
+      const documentWorkspaceMap = new Map(documents.map((doc) => [doc.id, doc.workspaceId]));
+
+      for (const entry of chunkCountsByDocument) {
+        const workspaceId = documentWorkspaceMap.get(entry.documentId);
+        if (!workspaceId) continue;
+        chunkCountMap.set(
+          workspaceId,
+          (chunkCountMap.get(workspaceId) || 0) + entry._count._all
+        );
+      }
+    }
 
     const response: WorkspaceResponse[] = workspaces.map((w) => ({
       id: w.id,
       name: w.name,
       createdAt: w.createdAt.toISOString(),
+      documentCount: documentCountMap.get(w.id) || 0,
+      chunkCount: chunkCountMap.get(w.id) || 0,
     }));
 
     return NextResponse.json({ workspaces: response });
@@ -105,6 +143,8 @@ export async function POST(request: NextRequest) {
       id: workspace.id,
       name: workspace.name,
       createdAt: workspace.createdAt.toISOString(),
+      documentCount: 0,
+      chunkCount: 0,
     };
 
     return NextResponse.json(response, { status: 201 });

@@ -251,16 +251,16 @@ export function WorkspaceSwitcher() {
               openDropdown();
             }
           }}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 dark:focus:ring-offset-gray-900 transition-colors max-w-[180px]"
+          className="flex items-center gap-2 w-full px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 dark:focus:ring-offset-gray-900 transition-colors"
           aria-haspopup="listbox"
           aria-expanded={isOpen}
           aria-label={activeWorkspace ? `Workspace: ${activeWorkspace.name}` : 'Select workspace'}
         >
-          <span className="truncate">
+          <span className="min-w-0 truncate">
             {activeWorkspace ? activeWorkspace.name : 'Select workspace'}
           </span>
           <ChevronDown
-            className={`w-4 h-4 flex-shrink-0 text-gray-500 dark:text-gray-400 transition-transform ${
+            className={`ml-auto w-4 h-4 flex-shrink-0 text-gray-500 dark:text-gray-400 transition-transform ${
               isOpen ? 'rotate-180' : ''
             }`}
           />
@@ -269,7 +269,7 @@ export function WorkspaceSwitcher() {
         {/* Dropdown Panel */}
         {isOpen && (
           <div
-            className="absolute left-0 top-full mt-1 w-64 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50"
+            className="absolute left-1/2 top-full mt-1 -translate-x-1/2 min-w-full w-[calc(100%+0.5rem)] max-w-[calc(100%+0.5rem)] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50"
             role="listbox"
             aria-label="Workspaces"
             onKeyDown={handleKeyDown}

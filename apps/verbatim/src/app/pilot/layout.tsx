@@ -109,6 +109,9 @@ function Sidebar() {
 
       {/* Workspace Switcher */}
       <div className="px-3 py-3 border-b border-gray-200 dark:border-gray-800">
+        <h3 className="px-3 mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          Workspace
+        </h3>
         <WorkspaceSwitcher />
       </div>
 

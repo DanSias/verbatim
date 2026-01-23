@@ -7,6 +7,20 @@
  * Accessible with focus trap, Esc to close, and proper ARIA attributes.
  */
 
+import { useState, useEffect, useRef, useCallback, type FormEvent } from 'react';
+import { X } from 'lucide-react';
+
+/** Workspace response from POST /api/workspaces */
+export interface CreatedWorkspace {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+interface CreateWorkspaceModalProps {
+  /** Whether the modal is open */
+  isOpen: boolean;
+  /** Callback when the modal should close */
   onClose: () => void;
   /** Callback when a workspace is successfully created */
   onCreated: (workspace: CreatedWorkspace) => void;

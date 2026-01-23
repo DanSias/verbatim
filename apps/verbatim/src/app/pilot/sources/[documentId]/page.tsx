@@ -10,9 +10,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-
-/** LocalStorage keys */
-const LS_WORKSPACE_ID = 'verbatim_pilot_workspaceId';
+import { useActiveWorkspace } from '@/components/workspace-switcher';
 
 /** Chunk from API */
 interface Chunk {
@@ -59,8 +57,9 @@ export default function PilotSourceDetailPage({
   const { documentId } = params;
   const router = useRouter();
 
-  // Active workspace from localStorage
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  // Active workspace from shared hook
+  const { activeWorkspace } = useActiveWorkspace();
+  const workspaceId = activeWorkspace?.id ?? null;
 
   // Document state
   const [document, setDocument] = useState<Document | null>(null);
@@ -74,16 +73,6 @@ export default function PilotSourceDetailPage({
 
   // Expanded chunks
   const [expandedChunks, setExpandedChunks] = useState<Set<string>>(new Set());
-
-  // Load workspace from localStorage
-  useEffect(() => {
-    try {
-      const savedId = localStorage.getItem(LS_WORKSPACE_ID);
-      if (savedId) setWorkspaceId(savedId);
-    } catch {
-      // Ignore
-    }
-  }, []);
 
   // Fetch document
   const fetchDocument = useCallback(async () => {
@@ -334,11 +323,7 @@ export default function PilotSourceDetailPage({
       {!workspaceId && (
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/40 rounded-lg p-4">
           <p className="text-sm text-yellow-700 dark:text-yellow-300">
-            No active workspace selected.{' '}
-            <Link href="/pilot/workspaces" className="text-yellow-800 dark:text-yellow-200 underline">
-              Select a workspace
-            </Link>{' '}
-            to enable delete.
+            No active workspace selected. Use the workspace switcher in the sidebar to enable delete.
           </p>
         </div>
       )}

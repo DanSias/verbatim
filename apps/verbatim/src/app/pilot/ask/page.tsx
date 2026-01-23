@@ -9,10 +9,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useActiveWorkspace } from '@/components/workspace-switcher';
 
-/** LocalStorage keys */
-const LS_WORKSPACE_ID = 'verbatim_pilot_workspaceId';
-const LS_WORKSPACE_NAME = 'verbatim_pilot_workspaceName';
+/** LocalStorage keys for non-workspace settings */
 const LS_TOP_K = 'verbatim_pilot_topK';
 const LS_CORPUS_SCOPE = 'verbatim_pilot_corpusScope';
 
@@ -49,9 +48,11 @@ interface AskResponse {
 }
 
 export default function PilotAskPage() {
-  // Form state
+  // Active workspace from shared hook
+  const { activeWorkspace } = useActiveWorkspace();
+
+  // Form state - workspace ID initialized from active workspace
   const [workspaceId, setWorkspaceId] = useState('');
-  const [workspaceName, setWorkspaceName] = useState<string | null>(null);
   const [question, setQuestion] = useState('');
   const [corpusScope, setCorpusScope] = useState<{ docs: boolean; kb: boolean }>({
     docs: true,
@@ -64,15 +65,16 @@ export default function PilotAskPage() {
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<AskResponse | null>(null);
 
-  // Load persisted values
+  // Sync workspace ID from active workspace
+  useEffect(() => {
+    if (activeWorkspace?.id) {
+      setWorkspaceId(activeWorkspace.id);
+    }
+  }, [activeWorkspace?.id]);
+
+  // Load persisted non-workspace settings
   useEffect(() => {
     try {
-      const savedWorkspaceId = localStorage.getItem(LS_WORKSPACE_ID);
-      if (savedWorkspaceId) setWorkspaceId(savedWorkspaceId);
-
-      const savedWorkspaceName = localStorage.getItem(LS_WORKSPACE_NAME);
-      if (savedWorkspaceName) setWorkspaceName(savedWorkspaceName);
-
       const savedTopK = localStorage.getItem(LS_TOP_K);
       if (savedTopK) setTopK(parseInt(savedTopK, 10) || 8);
 
@@ -87,17 +89,6 @@ export default function PilotAskPage() {
       // Ignore localStorage errors
     }
   }, []);
-
-  // Persist workspace ID
-  useEffect(() => {
-    try {
-      if (workspaceId) {
-        localStorage.setItem(LS_WORKSPACE_ID, workspaceId);
-      }
-    } catch {
-      // Ignore
-    }
-  }, [workspaceId]);
 
   // Persist topK
   useEffect(() => {
@@ -190,34 +181,14 @@ export default function PilotAskPage() {
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 space-y-4">
         {/* Workspace ID */}
         <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Workspace ID
-            </label>
-            <Link
-              href="/pilot/workspaces"
-              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-            >
-              Manage workspaces
-            </Link>
-          </div>
-          {workspaceName && workspaceId && (
-            <div className="mb-2 flex items-center gap-2 text-sm">
-              <span className="text-gray-600 dark:text-gray-400">Active:</span>
-              <span className="font-medium text-gray-900 dark:text-gray-100">{workspaceName}</span>
-              <Link
-                href="/pilot/workspaces"
-                className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-              >
-                Change
-              </Link>
-            </div>
-          )}
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Workspace ID
+          </label>
           <input
             type="text"
             value={workspaceId}
             onChange={(e) => setWorkspaceId(e.target.value)}
-            placeholder="e.g., clx123abc..."
+            placeholder={activeWorkspace ? 'Using active workspace' : 'Select workspace in sidebar'}
             className="w-full px-3 py-2 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900"
             disabled={loading}
           />

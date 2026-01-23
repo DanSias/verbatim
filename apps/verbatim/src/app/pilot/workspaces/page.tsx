@@ -4,13 +4,15 @@
  * Pilot Workspaces Page
  *
  * Manage workspaces: list, create, delete, and set active workspace.
+ * The active workspace is now primarily managed via the sidebar WorkspaceSwitcher,
+ * but this page still allows setting a workspace as active for convenience.
  */
 
 import { useState, useEffect, useCallback } from 'react';
-
-/** LocalStorage keys */
-const LS_WORKSPACE_ID = 'verbatim_pilot_workspaceId';
-const LS_WORKSPACE_NAME = 'verbatim_pilot_workspaceName';
+import {
+  useActiveWorkspace,
+  setActiveWorkspaceInStorage,
+} from '@/components/workspace-switcher';
 
 /** Workspace from API */
 interface Workspace {
@@ -28,14 +30,13 @@ async function readJsonOrText(res: Response) {
 }
 
 export default function PilotWorkspacesPage() {
+  // Active workspace from shared hook
+  const { activeWorkspace, setActiveWorkspace } = useActiveWorkspace();
+
   // State
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Active workspace from localStorage
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
-  const [activeWorkspaceName, setActiveWorkspaceName] = useState<string | null>(null);
 
   // Create form
   const [newName, setNewName] = useState('');
@@ -45,18 +46,6 @@ export default function PilotWorkspacesPage() {
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
-
-  // Load active workspace from localStorage
-  useEffect(() => {
-    try {
-      const savedId = localStorage.getItem(LS_WORKSPACE_ID);
-      const savedName = localStorage.getItem(LS_WORKSPACE_NAME);
-      if (savedId) setActiveWorkspaceId(savedId);
-      if (savedName) setActiveWorkspaceName(savedName);
-    } catch {
-      // Ignore
-    }
-  }, []);
 
   // Fetch workspaces
   const fetchWorkspaces = useCallback(async () => {
@@ -164,15 +153,8 @@ export default function PilotWorkspacesPage() {
       setWorkspaces((prev) => prev.filter((w) => w.id !== id));
 
       // Clear active workspace if it was deleted
-      if (activeWorkspaceId === id) {
-        try {
-          localStorage.removeItem(LS_WORKSPACE_ID);
-          localStorage.removeItem(LS_WORKSPACE_NAME);
-          setActiveWorkspaceId(null);
-          setActiveWorkspaceName(null);
-        } catch {
-          // Ignore
-        }
+      if (activeWorkspace?.id === id) {
+        setActiveWorkspaceInStorage(null);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete workspace');
@@ -180,31 +162,12 @@ export default function PilotWorkspacesPage() {
       setDeleting(null);
       setDeleteConfirm(null);
     }
-  }, [activeWorkspaceId]);
+  }, [activeWorkspace?.id]);
 
-  // Set active workspace
+  // Set active workspace (uses shared hook to broadcast change)
   const handleSetActive = useCallback((workspace: Workspace) => {
-    try {
-      localStorage.setItem(LS_WORKSPACE_ID, workspace.id);
-      localStorage.setItem(LS_WORKSPACE_NAME, workspace.name);
-      setActiveWorkspaceId(workspace.id);
-      setActiveWorkspaceName(workspace.name);
-    } catch {
-      // Ignore
-    }
-  }, []);
-
-  // Clear active workspace
-  const handleClearActive = useCallback(() => {
-    try {
-      localStorage.removeItem(LS_WORKSPACE_ID);
-      localStorage.removeItem(LS_WORKSPACE_NAME);
-      setActiveWorkspaceId(null);
-      setActiveWorkspaceName(null);
-    } catch {
-      // Ignore
-    }
-  }, []);
+    setActiveWorkspace({ id: workspace.id, name: workspace.name });
+  }, [setActiveWorkspace]);
 
   return (
     <div className="space-y-6">
@@ -213,31 +176,9 @@ export default function PilotWorkspacesPage() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Workspaces</h1>
         <p className="mt-1 text-gray-600 dark:text-gray-300">
           Manage workspaces for document ingestion and retrieval.
+          Use the workspace switcher in the sidebar to change the active workspace.
         </p>
       </div>
-
-      {/* Active workspace */}
-      <section className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900/40 rounded-lg p-4">
-        <h2 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">Active Workspace</h2>
-        {activeWorkspaceId ? (
-          <div className="flex items-center gap-3">
-            <span className="font-medium text-blue-900 dark:text-blue-100">{activeWorkspaceName}</span>
-            <code className="bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 rounded text-xs font-mono text-blue-700 dark:text-blue-300">
-              {activeWorkspaceId}
-            </code>
-            <button
-              onClick={handleClearActive}
-              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 ml-auto"
-            >
-              Clear
-            </button>
-          </div>
-        ) : (
-          <p className="text-sm text-blue-700 dark:text-blue-300">
-            No active workspace. Select one from the list below.
-          </p>
-        )}
-      </section>
 
       {/* Create workspace */}
       <section className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
@@ -294,7 +235,7 @@ export default function PilotWorkspacesPage() {
               <WorkspaceRow
                 key={workspace.id}
                 workspace={workspace}
-                isActive={workspace.id === activeWorkspaceId}
+                isActive={workspace.id === activeWorkspace?.id}
                 isDeleting={deleting === workspace.id}
                 isConfirming={deleteConfirm === workspace.id}
                 onSetActive={() => handleSetActive(workspace)}
@@ -377,7 +318,7 @@ function WorkspaceRow({
                 onClick={onSetActive}
                 className="px-3 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs font-medium rounded hover:bg-blue-200 dark:hover:bg-blue-900/60"
               >
-                Use in Pilot
+                Set Active
               </button>
             )}
             <button

@@ -4,42 +4,17 @@
  * Pilot Landing Page
  *
  * Entry point for internal testing UI.
- * Shows current workspace ID and links to ingest/ask pages.
+ * Shows links to ingest/ask pages. Workspace selection is handled by sidebar.
  */
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
-
-const LS_WORKSPACE_ID = 'verbatim_pilot_workspaceId';
-const LS_WORKSPACE_NAME = 'verbatim_pilot_workspaceName';
+import { useActiveWorkspace, setActiveWorkspaceInStorage } from '@/components/workspace-switcher';
 
 export default function PilotPage() {
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
-  const [workspaceName, setWorkspaceName] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
-
-  // Load workspace from localStorage on mount
-  useEffect(() => {
-    setMounted(true);
-    try {
-      const savedId = localStorage.getItem(LS_WORKSPACE_ID);
-      const savedName = localStorage.getItem(LS_WORKSPACE_NAME);
-      if (savedId) setWorkspaceId(savedId);
-      if (savedName) setWorkspaceName(savedName);
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, []);
+  const { activeWorkspace, isLoaded } = useActiveWorkspace();
 
   const handleClearWorkspace = () => {
-    try {
-      localStorage.removeItem(LS_WORKSPACE_ID);
-      localStorage.removeItem(LS_WORKSPACE_NAME);
-      setWorkspaceId(null);
-      setWorkspaceName(null);
-    } catch {
-      // Ignore
-    }
+    setActiveWorkspaceInStorage(null);
   };
 
   return (
@@ -54,42 +29,26 @@ export default function PilotPage() {
 
       {/* Workspace status */}
       <section className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300">Active Workspace</h2>
-          <Link
-            href="/pilot/workspaces"
-            className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-          >
-            Manage workspaces
-          </Link>
-        </div>
-        {mounted ? (
-          workspaceId ? (
-            <div className="flex items-center gap-3">
-              {workspaceName && (
-                <span className="font-medium text-gray-900 dark:text-gray-100">{workspaceName}</span>
-              )}
-              <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-sm font-mono text-gray-800 dark:text-gray-200">
-                {workspaceId}
-              </code>
-              <button
-                onClick={handleClearWorkspace}
-                className="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
-              >
-                Clear
-              </button>
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              No workspace set.{' '}
-              <Link href="/pilot/workspaces" className="text-blue-600 dark:text-blue-400 hover:underline">
-                Create or select a workspace
-              </Link>
-              .
-            </p>
-          )
-        ) : (
+        <h2 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Active Workspace</h2>
+        {!isLoaded ? (
           <p className="text-sm text-gray-400 dark:text-gray-500">Loading...</p>
+        ) : activeWorkspace ? (
+          <div className="flex items-center gap-3">
+            <span className="font-medium text-gray-900 dark:text-gray-100">{activeWorkspace.name}</span>
+            <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-sm font-mono text-gray-800 dark:text-gray-200">
+              {activeWorkspace.id}
+            </code>
+            <button
+              onClick={handleClearWorkspace}
+              className="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+            >
+              Clear
+            </button>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            No workspace selected. Use the workspace switcher in the sidebar.
+          </p>
         )}
       </section>
 

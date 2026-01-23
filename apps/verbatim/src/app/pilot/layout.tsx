@@ -23,6 +23,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme';
+import { WorkspaceSwitcher } from '@/components/workspace-switcher';
 
 /** Navigation item definition */
 interface NavItem {
@@ -104,6 +105,11 @@ function Sidebar() {
           </span>
         </div>
         <ThemeToggle />
+      </div>
+
+      {/* Workspace Switcher */}
+      <div className="px-3 py-3 border-b border-gray-200 dark:border-gray-800">
+        <WorkspaceSwitcher />
       </div>
 
       {/* Navigation */}

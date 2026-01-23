@@ -11,10 +11,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-
-/** LocalStorage keys */
-const LS_WORKSPACE_ID = 'verbatim_pilot_workspaceId';
-const LS_WORKSPACE_NAME = 'verbatim_pilot_workspaceName';
+import { useActiveWorkspace } from '@/components/workspace-switcher';
 
 /** Document from API */
 interface Document {
@@ -43,9 +40,10 @@ async function readJsonOrText(res: Response) {
 export default function PilotSourcesPage() {
   const searchParams = useSearchParams();
 
-  // Active workspace from localStorage
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
-  const [workspaceName, setWorkspaceName] = useState<string | null>(null);
+  // Active workspace from shared hook
+  const { activeWorkspace } = useActiveWorkspace();
+  const workspaceId = activeWorkspace?.id ?? null;
+  const workspaceName = activeWorkspace?.name ?? null;
 
   // Documents state
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -78,18 +76,6 @@ export default function PilotSourcesPage() {
       return () => clearTimeout(timer);
     }
   }, [successMessage]);
-
-  // Load active workspace from localStorage
-  useEffect(() => {
-    try {
-      const savedId = localStorage.getItem(LS_WORKSPACE_ID);
-      const savedName = localStorage.getItem(LS_WORKSPACE_NAME);
-      if (savedId) setWorkspaceId(savedId);
-      if (savedName) setWorkspaceName(savedName);
-    } catch {
-      // Ignore
-    }
-  }, []);
 
   // Debounce search input
   useEffect(() => {
@@ -211,36 +197,14 @@ export default function PilotSourcesPage() {
         </div>
       )}
 
-      {/* Active workspace */}
-      <section className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900/40 rounded-lg p-4">
-        <h2 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">Active Workspace</h2>
-        {workspaceId ? (
-          <div className="flex items-center gap-3">
-            <span className="font-medium text-blue-900 dark:text-blue-100">{workspaceName}</span>
-            <code className="bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 rounded text-xs font-mono text-blue-700 dark:text-blue-300">
-              {workspaceId}
-            </code>
-            <Link
-              href="/pilot/workspaces"
-              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 ml-auto"
-            >
-              Change
-            </Link>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-blue-700 dark:text-blue-300">
-              No active workspace. Select one to view sources.
-            </p>
-            <Link
-              href="/pilot/workspaces"
-              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 ml-auto"
-            >
-              Select Workspace
-            </Link>
-          </div>
-        )}
-      </section>
+      {/* No workspace prompt */}
+      {!workspaceId && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/40 rounded-lg p-4">
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            No active workspace selected. Use the workspace switcher in the sidebar to select one.
+          </p>
+        </div>
+      )}
 
       {/* Only show content if workspace is selected */}
       {workspaceId && (

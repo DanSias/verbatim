@@ -8,11 +8,9 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import Link from 'next/link';
+import { useActiveWorkspace } from '@/components/workspace-switcher';
 
-/** LocalStorage keys */
-const LS_WORKSPACE_ID = 'verbatim_pilot_workspaceId';
-const LS_WORKSPACE_NAME = 'verbatim_pilot_workspaceName';
+/** LocalStorage keys for non-workspace settings */
 const LS_CORPUS = 'verbatim_pilot_ingestCorpus';
 
 /** Corpus type */
@@ -45,9 +43,11 @@ interface IngestResponse {
 const MAX_DISPLAY_FILES = 50;
 
 export default function PilotIngestPage() {
-  // Form state
+  // Active workspace from shared hook
+  const { activeWorkspace } = useActiveWorkspace();
+
+  // Form state - workspace ID initialized from active workspace
   const [workspaceId, setWorkspaceId] = useState('');
-  const [workspaceName, setWorkspaceName] = useState<string | null>(null);
   const [corpus, setCorpus] = useState<Corpus>('docs');
   const [useFolderUpload, setUseFolderUpload] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<FileWithPath[]>([]);
@@ -62,15 +62,16 @@ export default function PilotIngestPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
-  // Load persisted values
+  // Sync workspace ID from active workspace
+  useEffect(() => {
+    if (activeWorkspace?.id) {
+      setWorkspaceId(activeWorkspace.id);
+    }
+  }, [activeWorkspace?.id]);
+
+  // Load persisted non-workspace settings
   useEffect(() => {
     try {
-      const savedWorkspaceId = localStorage.getItem(LS_WORKSPACE_ID);
-      if (savedWorkspaceId) setWorkspaceId(savedWorkspaceId);
-
-      const savedWorkspaceName = localStorage.getItem(LS_WORKSPACE_NAME);
-      if (savedWorkspaceName) setWorkspaceName(savedWorkspaceName);
-
       const savedCorpus = localStorage.getItem(LS_CORPUS);
       if (savedCorpus === 'docs' || savedCorpus === 'kb') {
         setCorpus(savedCorpus);
@@ -79,17 +80,6 @@ export default function PilotIngestPage() {
       // Ignore localStorage errors
     }
   }, []);
-
-  // Persist workspace ID
-  useEffect(() => {
-    try {
-      if (workspaceId) {
-        localStorage.setItem(LS_WORKSPACE_ID, workspaceId);
-      }
-    } catch {
-      // Ignore
-    }
-  }, [workspaceId]);
 
   // Persist corpus
   useEffect(() => {
@@ -219,33 +209,19 @@ export default function PilotIngestPage() {
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 space-y-6">
         {/* Workspace ID */}
         <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Workspace ID</label>
-            <Link href="/pilot/workspaces" className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
-              Manage workspaces
-            </Link>
-          </div>
-          {workspaceName && workspaceId && (
-            <div className="mb-2 flex items-center gap-2 text-sm">
-              <span className="text-gray-600 dark:text-gray-400">Active:</span>
-              <span className="font-medium text-gray-900 dark:text-gray-100">{workspaceName}</span>
-              <Link href="/pilot/workspaces" className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
-                Change
-              </Link>
-            </div>
-          )}
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Workspace ID</label>
           <input
             type="text"
             value={workspaceId}
             onChange={(e) => setWorkspaceId(e.target.value)}
-            placeholder="e.g., clx123abc..."
+            placeholder={activeWorkspace ? 'Using active workspace' : 'Select workspace in sidebar'}
             className="w-full px-3 py-2 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900"
             disabled={uploading}
           />
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {workspaceName
-              ? 'Using active workspace. You can also enter a different ID manually.'
-              : 'Workspace must already exist. Go to Workspaces to create one.'}
+            {activeWorkspace
+              ? 'Using active workspace from sidebar. You can also enter a different ID.'
+              : 'Select a workspace in the sidebar, or enter an ID manually.'}
           </p>
         </div>
 

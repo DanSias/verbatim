@@ -1,83 +1,91 @@
 'use client';
 
 /**
- * Pilot Landing Page
+ * Pilot Landing Page - Smart Redirect
  *
- * Entry point for internal testing UI.
- * Shows links to ingest/ask pages. Workspace selection is handled by sidebar.
+ * Automatically routes users to the most appropriate page based on workspace state:
+ * - No active workspace → /pilot/workspaces
+ * - Active workspace with no content → /pilot/ingest
+ * - Active workspace with content → /pilot/sources
  */
 
-import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
-import { PILOT_NAV_SECTIONS, type PilotNavSection } from '@/lib/pilot/nav';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useActiveWorkspace } from '@/components/workspace-switcher';
+import { Loader2 } from 'lucide-react';
+
+interface WorkspaceStats {
+  workspaceId: string;
+  documentsCount: number;
+  chunksCount: number;
+}
 
 export default function PilotPage() {
-  const cardSections: PilotNavSection[] = PILOT_NAV_SECTIONS.filter(
-    (section) => section.label !== 'Overview'
-  );
+  const router = useRouter();
+  const { activeWorkspace, isLoaded } = useActiveWorkspace();
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
+  useEffect(() => {
+    // Wait for workspace to load from localStorage
+    if (!isLoaded) return;
+
+    // Start redirecting process
+    setIsRedirecting(true);
+
+    // Case 1: No active workspace → send to workspaces page
+    if (!activeWorkspace) {
+      router.push('/pilot/workspaces');
+      return;
+    }
+
+    // Case 2: Active workspace exists → check if it has content
+    const checkWorkspaceContent = async () => {
+      try {
+        const response = await fetch(`/api/workspaces/${activeWorkspace.id}/stats`, {
+          headers: { Accept: 'application/json' },
+        });
+
+        if (!response.ok) {
+          // If stats call fails, default to sources page (don't strand user)
+          console.warn('Failed to fetch workspace stats, defaulting to sources');
+          router.push('/pilot/sources');
+          return;
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType?.includes('application/json')) {
+          console.warn('Non-JSON response from stats API, defaulting to sources');
+          router.push('/pilot/sources');
+          return;
+        }
+
+        const stats: WorkspaceStats = await response.json();
+
+        // Case 2a: Workspace has no documents/chunks → send to ingest
+        if (stats.documentsCount === 0 || stats.chunksCount === 0) {
+          router.push('/pilot/ingest');
+        } else {
+          // Case 2b: Workspace has content → send to sources
+          router.push('/pilot/sources');
+        }
+      } catch (error) {
+        // On error, default to sources page (don't strand user)
+        console.error('Error checking workspace content:', error);
+        router.push('/pilot/sources');
+      }
+    };
+
+    checkWorkspaceContent();
+  }, [activeWorkspace, isLoaded, router]);
+
+  // Show loading state while redirecting
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Pilot Dashboard</h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-300">
-          Configure workspaces, manage sources, and evaluate retrieval and answers.
+    <div className="flex min-h-[50vh] items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          {!isLoaded ? 'Loading workspace...' : isRedirecting ? 'Redirecting...' : 'Loading...'}
         </p>
-      </div>
-
-      {/* Action cards */}
-      <div className="space-y-6">
-        {cardSections.map((section) => {
-          const sectionId = section.label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-          const itemCount = section.items.length;
-          const gridClass =
-            itemCount === 1
-              ? 'grid-cols-1'
-              : itemCount === 2
-                ? 'grid-cols-1 md:grid-cols-2'
-                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
-          return (
-            <section key={section.label} aria-labelledby={`pilot-${sectionId}-heading`}>
-              <h2
-                id={`pilot-${sectionId}-heading`}
-                className="text-sm font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wider"
-              >
-                {section.label}
-              </h2>
-              {section.sectionDescription && (
-                <p className="mt-2 mb-4 text-sm text-gray-600 dark:text-gray-400">
-                  {section.sectionDescription}
-                </p>
-              )}
-              <div className={`grid ${gridClass} gap-4`}>
-                {section.items.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className="group relative flex h-full flex-col gap-3 rounded-lg border border-gray-200 bg-white p-6 transition-all hover:-translate-y-0.5 hover:border-blue-300 hover:bg-gray-50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-blue-700 dark:hover:bg-gray-800/60 dark:focus-visible:ring-offset-gray-950"
-                    >
-                      <span className="absolute right-4 top-4 text-gray-300 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100 group-focus-within:translate-x-0.5 group-focus-within:opacity-100 dark:text-gray-600">
-                        <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                      </span>
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                          <Icon className="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                          {item.label}
-                        </h3>
-                      </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">{item.description}</p>
-                    </Link>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })}
       </div>
     </div>
   );

@@ -1,5 +1,4 @@
 import {
-  Home,
   Layers,
   UploadCloud,
   FileText,
@@ -27,18 +26,6 @@ export interface PilotNavSection {
 }
 
 export const PILOT_NAV_SECTIONS: PilotNavSection[] = [
-  {
-    label: 'Overview',
-    items: [
-      {
-        href: '/pilot',
-        label: 'Pilot Home',
-        description: 'Overview dashboard for all Pilot tools and workflows.',
-        icon: Home,
-        exactMatch: true,
-      },
-    ],
-  },
   {
     label: 'Core',
     sectionDescription: 'Manage workspaces and ingest documentation.',

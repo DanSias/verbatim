@@ -156,6 +156,34 @@ model Message {
 }
 
 // ============================================================================
+// Phase 8.2: Query Run Logging
+// Persists retrieval-only queries for analytics and debugging
+// Separate from QueryEvent (which logs LLM answer generation)
+// ============================================================================
+
+model QueryRun {
+  id          String   @id @default(cuid())
+  workspaceId String
+  createdAt   DateTime @default(now())
+
+  // Query parameters
+  question String
+  scope    String // "docs" | "kb" | "docs,kb"
+  topK     Int
+
+  // Retrieval metadata
+  retrievalMode String? // "keyword" | "vector"
+
+  // Results stored as JSON array
+  // Each item: { chunkId, score, citationUrl?, documentId?, documentTitle?, chunkOrdinal?, anchor? }
+  resultsJson Json
+
+  @@index([workspaceId, createdAt])
+  @@index([createdAt])
+  @@map("query_runs")
+}
+
+// ============================================================================
 // Phase 8.3: Query Event Logging
 // Persists query/answer events for analytics and debugging
 // ============================================================================

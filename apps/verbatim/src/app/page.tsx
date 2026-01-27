@@ -1,27 +1,32 @@
 /**
- * Verbatim Internal Web UI - Home
+ * Verbatim Landing Page
  *
- * Purpose: Landing page for internal operations.
- * See ARCHITECTURE.md Section 13 for Internal UI requirements.
+ * Sales-style landing page explaining Verbatim and how it works.
+ * Uses Pilot visual language with dark mode support.
  */
+
+import {
+  LandingNav,
+  Hero,
+  HowItWorks,
+  WhatYouGet,
+  WidgetCallout,
+  Security,
+  Footer,
+} from '@/components/landing';
+
 export default function HomePage() {
   return (
-    <main>
-      <h1>Verbatim</h1>
-      <p>Internal operations console</p>
-      <nav>
-        <ul>
-          <li>
-            <a href="/ingest">Ingestion</a>
-          </li>
-          <li>
-            <a href="/documents">Documents</a>
-          </li>
-          <li>
-            <a href="/debug">Debug</a>
-          </li>
-        </ul>
-      </nav>
-    </main>
+    <div className="min-h-screen bg-white dark:bg-gray-950">
+      <LandingNav />
+      <main>
+        <Hero />
+        <HowItWorks />
+        <WhatYouGet />
+        <WidgetCallout />
+        <Security />
+      </main>
+      <Footer />
+    </div>
   );
 }

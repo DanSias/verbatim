@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useActiveWorkspace } from '@/components/workspace-switcher';
+import { RecentQueries } from '@/components/query-runs';
 
 /** LocalStorage keys for non-workspace settings */
 const LS_TOP_K = 'verbatim_pilot_topK';
@@ -438,6 +439,9 @@ export default function PilotAskPage() {
           </details>
         </div>
       )}
+
+      {/* Recent queries */}
+      <RecentQueries workspaceId={workspaceId} />
     </div>
   );
 }

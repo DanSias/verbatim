@@ -28,6 +28,7 @@ import {
   type SearchResult,
   type SuggestedRoute,
 } from '@/lib/retrieval';
+import { logQueryRun } from '@/lib/query-run';
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
@@ -90,6 +91,19 @@ export async function POST(request: NextRequest) {
       question,
       topK,
       corpusScope,
+    });
+
+    // Log query run (non-blocking, fire-and-forget)
+    void logQueryRun({
+      workspaceId,
+      question,
+      scope: corpusScope,
+      topK: retrieval.debug.topK,
+      retrievalMode: retrieval.debug.retrievalMode,
+      results: retrieval.results,
+    }).catch((err) => {
+      // Already logged in logQueryRun, but catch to ensure promise doesn't reject
+      console.warn('[Ask] Query run logging failed:', err);
     });
 
     const response: AskResponse = {

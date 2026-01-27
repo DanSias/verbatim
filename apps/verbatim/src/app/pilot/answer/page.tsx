@@ -112,6 +112,9 @@ export default function PilotAnswerPage() {
   const [forceTicketDraft, setForceTicketDraft] = useState(false);
   const [minConfidence, setMinConfidence] = useState<ConfidenceLevel | ''>('');
 
+  // UI state
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   // Request state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<FriendlyError | null>(null);
@@ -338,48 +341,51 @@ export default function PilotAnswerPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-          Answer: Generate a Response
+          Answer: Generate a cited response
         </h1>
         <p className="mt-1 text-gray-600 dark:text-gray-300">
-          Generate a cited answer from your workspace using retrieved context and an LLM.
+          Turn retrieved context into a grounded answer with citations.
         </p>
       </div>
 
       {/* Form */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 space-y-4">
-        {/* Active workspace */}
-        <div className="border-b border-gray-200 dark:border-gray-800 pb-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              {activeWorkspace
-                ? `${activeWorkspace.name} Workspace`
-                : 'No active workspace selected'}
-            </span>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {statsLoading && 'Loading workspace stats...'}
-              {!statsLoading && workspaceStats && (
-                <>
-                  {workspaceStats.documentCount} documents • {workspaceStats.chunkCount} chunks
-                </>
-              )}
-              {!statsLoading && !workspaceStats && !statsError && '0 documents • 0 chunks'}
-            </span>
-          </div>
-          {!activeWorkspace && (
-            <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Select or create a workspace using the sidebar switcher.
-            </div>
-          )}
-          {statsError && (
-            <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
-              Unable to load workspace stats. Answering still works.
-            </p>
-          )}
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 space-y-5">
+        {/* Workspace context row - compact */}
+        <div className="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-800">
+          <span className="text-sm text-gray-700 dark:text-gray-300">
+            {activeWorkspace ? (
+              <>
+                <span className="font-medium text-gray-900 dark:text-gray-100">
+                  {activeWorkspace.name}
+                </span>
+                {' '}Workspace
+              </>
+            ) : (
+              <span className="text-gray-500 dark:text-gray-400">No workspace selected</span>
+            )}
+          </span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {statsLoading && 'Loading...'}
+            {!statsLoading && workspaceStats && (
+              <>
+                {workspaceStats.documentCount} documents • {workspaceStats.chunkCount} chunks
+              </>
+            )}
+            {!statsLoading && !workspaceStats && !statsError && '0 documents • 0 chunks'}
+          </span>
         </div>
 
-        {/* Question */}
+        {!activeWorkspace && (
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/40 rounded-lg p-3">
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              Select a workspace using the sidebar switcher to enable answering.
+            </p>
+          </div>
+        )}
+
+        {/* Question - Primary focus */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
             Question
           </label>
           <textarea
@@ -387,139 +393,170 @@ export default function PilotAnswerPage() {
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Enter your question... (Enter to submit, Shift+Enter for newline)"
-            rows={3}
-            className="w-full px-3 py-2 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900 resize-y"
+            rows={4}
+            className="w-full px-3 py-2.5 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-base text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900 resize-y"
             disabled={loading}
           />
         </div>
 
-        {/* Options row 1 */}
-        <div className="flex flex-wrap gap-6">
-          {/* Provider */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              LLM Provider
-            </label>
-            <select
-              value={provider}
-              onChange={(e) => setProvider(e.target.value as Provider)}
-              disabled={loading}
-              className="px-3 py-1.5 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900"
-            >
-              {PROVIDERS.map((p) => (
-                <option key={p} value={p}>
-                  {p.charAt(0).toUpperCase() + p.slice(1)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Search in */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Search in
-            </label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={corpusScope.docs}
-                  onChange={(e) =>
-                    setCorpusScope((prev) => ({ ...prev, docs: e.target.checked }))
-                  }
-                  disabled={loading}
-                  className="text-blue-600 focus:ring-blue-500 rounded"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Docs</span>
+        {/* Generation settings - 3-column responsive grid */}
+        <div>
+          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            Generation settings
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {/* LLM Provider */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                LLM Provider
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={corpusScope.kb}
-                  onChange={(e) =>
-                    setCorpusScope((prev) => ({ ...prev, kb: e.target.checked }))
-                  }
-                  disabled={loading}
-                  className="text-blue-600 focus:ring-blue-500 rounded"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Knowledge Base</span>
-              </label>
-            </div>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Choose which sources to search.
-            </p>
-          </div>
-
-          {/* Results to consider */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Results to consider
-            </label>
-            <input
-              type="number"
-              value={topK}
-              onChange={(e) => setTopK(parseInt(e.target.value, 10) || 6)}
-              min={1}
-              max={10}
-              className="w-20 px-3 py-1.5 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900"
-              disabled={loading}
-            />
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Higher values may add context but can increase latency and cost.
-            </p>
-          </div>
-        </div>
-
-        {/* Options row 2 - Ticket draft controls */}
-        <div className="flex flex-wrap gap-6 pt-2 border-t border-gray-100 dark:border-gray-800">
-          {/* Force ticket draft */}
-          <div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={forceTicketDraft}
-                onChange={(e) => setForceTicketDraft(e.target.checked)}
+              <select
+                value={provider}
+                onChange={(e) => setProvider(e.target.value as Provider)}
                 disabled={loading}
-                className="text-blue-600 focus:ring-blue-500 rounded"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Force ticket draft</span>
-            </label>
-          </div>
+                className="w-full px-3 py-2 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900"
+              >
+                {PROVIDERS.map((p) => (
+                  <option key={p} value={p}>
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* Min confidence */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Min Confidence
-            </label>
-            <select
-              value={minConfidence}
-              onChange={(e) => setMinConfidence(e.target.value as ConfidenceLevel | '')}
-              disabled={loading}
-              className="px-3 py-1.5 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900"
-            >
-              <option value="">None</option>
-              {CONFIDENCE_LEVELS.map((level) => (
-                <option key={level} value={level}>
-                  {level.charAt(0).toUpperCase() + level.slice(1)}
-                </option>
-              ))}
-            </select>
+            {/* Results to consider */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                Results to consider
+              </label>
+              <input
+                type="number"
+                value={topK}
+                onChange={(e) => setTopK(parseInt(e.target.value, 10) || 6)}
+                min={1}
+                max={10}
+                className="w-full px-3 py-2 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900"
+                disabled={loading}
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                How many retrieved chunks to include.
+              </p>
+            </div>
+
+            {/* Include sources */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                Include sources
+              </label>
+              <div className="flex gap-4 items-center h-[40px]">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={corpusScope.docs}
+                    onChange={(e) =>
+                      setCorpusScope((prev) => ({ ...prev, docs: e.target.checked }))
+                    }
+                    disabled={loading}
+                    className="text-blue-600 focus:ring-blue-500 rounded"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">Docs</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={corpusScope.kb}
+                    onChange={(e) =>
+                      setCorpusScope((prev) => ({ ...prev, kb: e.target.checked }))
+                    }
+                    disabled={loading}
+                    className="text-blue-600 focus:ring-blue-500 rounded"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">KB</span>
+                </label>
+              </div>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Choose which sources to search.
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Submit button */}
-        <button
-          onClick={handleSubmit}
-          disabled={loading || !workspaceId.trim()}
-          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
-        >
-          {loading ? 'Generating...' : 'Get Answer'}
-        </button>
-        {!workspaceId.trim() && (
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Select an active workspace to enable answering.
+        {/* Advanced options - Collapsible */}
+        <div className="pt-3 border-t border-gray-100 dark:border-gray-800">
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded px-1 -mx-1"
+            aria-expanded={showAdvanced}
+          >
+            <svg
+              className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-90' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            Advanced
+          </button>
+
+          {showAdvanced && (
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-5">
+              {/* Force ticket draft */}
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={forceTicketDraft}
+                    onChange={(e) => setForceTicketDraft(e.target.checked)}
+                    disabled={loading}
+                    className="text-blue-600 focus:ring-blue-500 rounded"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">Force ticket draft</span>
+                </label>
+                <p className="mt-1 ml-6 text-xs text-gray-500 dark:text-gray-400">
+                  Always generate a support ticket template instead of a direct answer.
+                </p>
+              </div>
+
+              {/* Min confidence */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                  Min Confidence
+                </label>
+                <select
+                  value={minConfidence}
+                  onChange={(e) => setMinConfidence(e.target.value as ConfidenceLevel | '')}
+                  disabled={loading}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-offset-gray-900"
+                >
+                  <option value="">None</option>
+                  {CONFIDENCE_LEVELS.map((level) => (
+                    <option key={level} value={level}>
+                      {level.charAt(0).toUpperCase() + level.slice(1)}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Threshold for returning a direct answer vs. ticket draft.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Submit button with helper text */}
+        <div className="pt-2">
+          <button
+            onClick={handleSubmit}
+            disabled={loading || !workspaceId.trim()}
+            className="px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading ? 'Generating...' : 'Generate answer'}
+          </button>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            Uses retrieved context + citations.
           </p>
-        )}
+        </div>
       </div>
 
       {/* Error display */}
@@ -783,9 +820,11 @@ function FriendlyErrorBanner({ error }: { error: FriendlyError }) {
               {error.raw}
             </pre>
           )}
-          {error.details && (
+          {error.details !== undefined && (
             <pre className="whitespace-pre-wrap rounded bg-white/60 dark:bg-black/20 border border-red-200/60 dark:border-red-900/40 p-2 text-[11px] text-red-800 dark:text-red-200">
-              {JSON.stringify(error.details, null, 2)}
+              {typeof error.details === 'string'
+                ? error.details
+                : JSON.stringify(error.details, null, 2)}
             </pre>
           )}
         </div>
